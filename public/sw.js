@@ -1,9 +1,9 @@
 const CACHE_NAME = 'sk-profili-v2';
 const ASSETS_TO_PRECACHE = [
-  '/',
-  '/index.html',
-  '/manifest.json',
-  '/icon.svg'
+  './',
+  'index.html',
+  'manifest.json',
+  'icon.svg'
 ];
 
 // Install Event
@@ -65,7 +65,7 @@ self.addEventListener('fetch', (event) => {
           }
           // If requesting a page/navigation, fall back to index.html
           if (event.request.mode === 'navigate') {
-            return caches.match('/index.html');
+            return caches.match('index.html') || caches.match('./index.html') || caches.match('./');
           }
         });
       })

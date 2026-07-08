@@ -6,7 +6,7 @@ import './index.css';
 // Регистрация Service Worker для офлайн режима (PWA)
 if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
+    navigator.serviceWorker.register('sw.js')
       .then((reg) => {
         console.log('PWA ServiceWorker registered successfully:', reg.scope);
       })
@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
 } else if ('serviceWorker' in navigator) {
   // Разрешаем регистрацию и в деве, если нужно проверить локально
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js')
+    navigator.serviceWorker.register('sw.js')
       .then((reg) => {
         console.log('PWA ServiceWorker registered in dev:', reg.scope);
       })
