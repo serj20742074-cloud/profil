@@ -4,7 +4,7 @@ import App from './App.tsx';
 import './index.css';
 
 // Регистрация Service Worker для офлайн режима (PWA)
-if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
+if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js')
       .then((reg) => {
@@ -12,17 +12,6 @@ if ('serviceWorker' in navigator && process.env.NODE_ENV === 'production') {
       })
       .catch((err) => {
         console.error('PWA ServiceWorker registration failed:', err);
-      });
-  });
-} else if ('serviceWorker' in navigator) {
-  // Разрешаем регистрацию и в деве, если нужно проверить локально
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('sw.js')
-      .then((reg) => {
-        console.log('PWA ServiceWorker registered in dev:', reg.scope);
-      })
-      .catch((err) => {
-        console.warn('PWA ServiceWorker registration warning:', err);
       });
   });
 }
