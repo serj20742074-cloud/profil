@@ -526,41 +526,21 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({ profiles, curren
         <div className="relative z-10 space-y-2">
           <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-500/30 text-blue-100 text-xs font-bold uppercase tracking-wider">
             <BadgeInfo className="w-3.5 h-3.5" />
-            <span>Анализ программы в формате Markdown</span>
+            <span>Анализ программы</span>
           </div>
           <h2 className="text-2xl font-extrabold tracking-tight">Инструментальный Анализ Съемки и Выправки</h2>
           <p className="text-blue-100 text-sm max-w-2xl leading-relaxed">
-            Генерирует структурированные отчеты по состоянию продольных профилей, выправке километров путей, нарушениям периодичности съемки и ТБ-запретам в точном Markdown-формате для дальнейшей вставки в документы или ТРА.
+            Генерирует структурированные отчеты по состоянию продольных профилей, выправке километров путей, нарушениям периодичности съемки и ТБ-запретам для дальнейшей вставки в документы или ТРА.
           </p>
         </div>
       </div>
 
       {/* Панель инструментов */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200/60 shadow-xs">
-        {/* Переключатель вкладок */}
-        <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200/50">
-          <button
-            onClick={() => setActiveTab('preview')}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'preview'
-                ? 'bg-white text-slate-800 shadow-xs border border-slate-200/20'
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <Eye className="w-3.5 h-3.5" />
-            <span>Визуальный просмотр</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('raw')}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              activeTab === 'raw'
-                ? 'bg-white text-slate-800 shadow-xs border border-slate-200/20'
-                : 'text-slate-500 hover:text-slate-800'
-            }`}
-          >
-            <Edit3 className="w-3.5 h-3.5" />
-            <span>Исходный Markdown код</span>
-          </button>
+        {/* Описание режима */}
+        <div className="flex items-center gap-2 text-xs text-slate-500 font-bold">
+          <Eye className="w-4 h-4 text-blue-600" />
+          <span>Визуальный просмотр отчета</span>
         </div>
 
         {/* Действия */}
@@ -587,14 +567,6 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({ profiles, curren
           </button>
 
           <button
-            onClick={handleDownload}
-            className="flex items-center justify-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
-          >
-            <Download className="w-3.5 h-3.5" />
-            <span>Скачать .md</span>
-          </button>
-
-          <button
             onClick={handleDownloadWord}
             className="flex items-center justify-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
             title="Экспортировать аналитический отчет в Microsoft Word"
@@ -607,49 +579,35 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({ profiles, curren
 
       {/* Основной контент */}
       <div className="bg-white rounded-2xl border border-slate-200/60 shadow-xs overflow-hidden">
-        {activeTab === 'preview' ? (
-          <div className="p-6 md:p-8 overflow-x-auto">
-            {/* Темы оформления отчета для предпросмотра */}
-            <div className="markdown-body text-slate-800 leading-relaxed max-w-none prose prose-slate">
-              <ReactMarkdown 
-                components={{
-                  h1: ({node, ...props}) => <h1 className="text-2xl font-black text-slate-900 border-b border-slate-200 pb-3 mb-5 mt-2 tracking-tight" {...props} />,
-                  h2: ({node, ...props}) => <h2 className="text-lg font-extrabold text-slate-800 mt-8 mb-4 border-l-4 border-blue-600 pl-3 tracking-tight" {...props} />,
-                  h3: ({node, ...props}) => <h3 className="text-base font-bold text-slate-800 mt-6 mb-2" {...props} />,
-                  p: ({node, ...props}) => <p className="text-sm text-slate-600 mb-4" {...props} />,
-                  ul: ({node, ...props}) => <ul className="list-disc pl-5 space-y-1 text-sm text-slate-600 mb-4" {...props} />,
-                  li: ({node, ...props}) => <li className="mb-1" {...props} />,
-                  strong: ({node, ...props}) => <strong className="font-bold text-slate-900" {...props} />,
-                  code: ({node, ...props}) => <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-xs text-rose-600 border border-slate-200/40" {...props} />,
-                  table: ({node, ...props}) => (
-                    <div className="overflow-x-auto my-6 border border-slate-200 rounded-xl">
-                      <table className="w-full text-left text-sm border-collapse" {...props} />
-                    </div>
-                  ),
-                  thead: ({node, ...props}) => <thead className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider" {...props} />,
-                  tbody: ({node, ...props}) => <tbody className="divide-y divide-slate-100 text-slate-700" {...props} />,
-                  tr: ({node, ...props}) => <tr className="hover:bg-slate-50/50 transition-colors" {...props} />,
-                  th: ({node, ...props}) => <th className="px-4 py-3 font-bold text-slate-600" {...props} />,
-                  td: ({node, ...props}) => <td className="px-4 py-3" {...props} />
-                }}
-              >
-                {reportText}
-              </ReactMarkdown>
-            </div>
+        <div className="p-6 md:p-8 overflow-x-auto">
+          {/* Темы оформления отчета для предпросмотра */}
+          <div className="markdown-body text-slate-800 leading-relaxed max-w-none prose prose-slate">
+            <ReactMarkdown 
+              components={{
+                h1: ({node, ...props}) => <h1 className="text-2xl font-black text-slate-900 border-b border-slate-200 pb-3 mb-5 mt-2 tracking-tight" {...props} />,
+                h2: ({node, ...props}) => <h2 className="text-lg font-extrabold text-slate-800 mt-8 mb-4 border-l-4 border-blue-600 pl-3 tracking-tight" {...props} />,
+                h3: ({node, ...props}) => <h3 className="text-base font-bold text-slate-800 mt-6 mb-2" {...props} />,
+                p: ({node, ...props}) => <p className="text-sm text-slate-600 mb-4" {...props} />,
+                ul: ({node, ...props}) => <ul className="list-disc pl-5 space-y-1 text-sm text-slate-600 mb-4" {...props} />,
+                li: ({node, ...props}) => <li className="mb-1" {...props} />,
+                strong: ({node, ...props}) => <strong className="font-bold text-slate-900" {...props} />,
+                code: ({node, ...props}) => <code className="bg-slate-100 px-1.5 py-0.5 rounded font-mono text-xs text-rose-600 border border-slate-200/40" {...props} />,
+                table: ({node, ...props}) => (
+                  <div className="overflow-x-auto my-6 border border-slate-200 rounded-xl">
+                    <table className="w-full text-left text-sm border-collapse" {...props} />
+                  </div>
+                ),
+                thead: ({node, ...props}) => <thead className="bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-500 uppercase tracking-wider" {...props} />,
+                tbody: ({node, ...props}) => <tbody className="divide-y divide-slate-100 text-slate-700" {...props} />,
+                tr: ({node, ...props}) => <tr className="hover:bg-slate-50/50 transition-colors" {...props} />,
+                th: ({node, ...props}) => <th className="px-4 py-3 font-bold text-slate-600" {...props} />,
+                td: ({node, ...props}) => <td className="px-4 py-3" {...props} />
+              }}
+            >
+              {reportText}
+            </ReactMarkdown>
           </div>
-        ) : (
-          <div className="p-4">
-            <textarea
-              value={reportText}
-              onChange={(e) => setReportText(e.target.value)}
-              className="w-full h-[600px] font-mono text-xs bg-slate-900 text-slate-100 rounded-xl p-5 focus:outline-none focus:ring-2 focus:ring-blue-500 leading-relaxed overflow-y-auto border border-slate-800 shadow-inner"
-              placeholder="Введите или отредактируйте Markdown здесь..."
-            />
-            <p className="text-xs text-slate-400 mt-2 flex items-center gap-1 pl-1">
-              <span>💡 Вы можете редактировать Markdown прямо в поле выше, перед тем как скопировать или скачать файл.</span>
-            </p>
-          </div>
-        )}
+        </div>
       </div>
 
     </div>

@@ -262,7 +262,7 @@ export default function App() {
               }`}
             >
               <FileText className="w-4 h-4 text-emerald-600" />
-              <span>Анализ (Markdown)</span>
+              <span>Анализ</span>
             </button>
 
             <button
