@@ -109,15 +109,16 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({ profiles, curren
       md += `✅ **Нарушений периодичности съемки не выявлено.** На всех станционных путях разрешено закрепление тормозными башмаками.\n\n`;
     } else {
       md += `Выявлено **${activeProhibitions.length}** путей с активным запретом на закрепление ТБ:\n\n`;
-      md += `| Станция | № Пути | Специализация пути | Последняя съемка | Срок контроля | Просрочено (лет) |\n`;
-      md += `| :--- | :---: | :--- | :---: | :---: | :---: |\n`;
+      md += `| Станция | № Пути | Специализация пути | Последняя съемка | Срок контроля | Просрочено (лет) | Примечание (причины/что сделано) |\n`;
+      md += `| :--- | :---: | :--- | :---: | :---: | :---: | :--- |\n`;
       activeProhibitions.forEach(p => {
         const tb = getTbProhibitionStatus(p, currentDate);
         const prevYear = p.prevSurveyDate ? new Date(p.prevSurveyDate).getFullYear() : 0;
         const currentYear = new Date(currentDate).getFullYear();
         const yearsOverdue = currentYear - prevYear - tb.limitYears;
         const spec = p.trackSpecialization || (p.trackType === 'main' ? 'Главный' : p.trackType === 'station' ? 'Приемо-отправочный' : 'Прочий');
-        md += `| **${p.station}** | ${p.trackNumber} | *${spec}* | ${formatDate(p.prevSurveyDate)} | ${tb.limitYears} лет | **+${yearsOverdue > 0 ? yearsOverdue : 1} г.** |\n`;
+        const note = p.notes || '—';
+        md += `| **${p.station}** | ${p.trackNumber} | *${spec}* | ${formatDate(p.prevSurveyDate)} | ${tb.limitYears} лет | **+${yearsOverdue > 0 ? yearsOverdue : 1} г.** | ${note} |\n`;
       });
       md += `\n*Необходимо срочно выполнить инструментальную съемку продольного профиля по данным путям и обновить ТРА станций.*\n\n`;
     }
@@ -129,12 +130,13 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({ profiles, curren
     if (overdueWorks.length === 0) {
       md += `✅ **Просроченных плановых работ нет.** Все текущие задачи укладываются в установленный график.\n\n`;
     } else {
-      md += `| Станция | Вид работы | № Пути | Специализация пути | План. срок | Ответственное предприятие |\n`;
-      md += `| :--- | :---: | :---: | :--- | :---: | :--- |\n`;
+      md += `| Станция | Вид работы | № Пути | Специализация пути | План. срок | Примечание (причины/что сделано) | Ответственное предприятие |\n`;
+      md += `| :--- | :---: | :---: | :--- | :---: | :--- | :--- |\n`;
       overdueWorks.forEach(p => {
         const catLabel = p.category === 'alignment' ? 'Выправка' : 'Съемка';
         const spec = p.trackSpecialization || (p.trackType === 'main' ? 'Главный' : p.trackType === 'station' ? 'Приемо-отправочный' : 'Прочий');
-        md += `| **${p.station}** | ${catLabel} | ${p.trackNumber} | *${spec}* | **${formatDate(p.plannedDate)}** | ${p.enterprise} |\n`;
+        const note = p.notes || '—';
+        md += `| **${p.station}** | ${catLabel} | ${p.trackNumber} | *${spec}* | **${formatDate(p.plannedDate)}** | ${note} | ${p.enterprise} |\n`;
       });
       md += `\n`;
     }
@@ -383,6 +385,7 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({ profiles, curren
         <th>Последняя съемка</th>
         <th>Срок контроля</th>
         <th>Просрочено (лет)</th>
+        <th>Примечание (причины/что сделано)</th>
       </tr>
     </thead>
     <tbody>`;
@@ -392,6 +395,7 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({ profiles, curren
         const currentYear = new Date(currentDate).getFullYear();
         const yearsOverdue = currentYear - prevYear - tb.limitYears;
         const spec = p.trackSpecialization || (p.trackType === 'main' ? 'Главный' : p.trackType === 'station' ? 'Приемо-отправочный' : 'Прочий');
+        const note = p.notes || '—';
         html += `
       <tr>
         <td><strong>${p.station}</strong></td>
@@ -400,6 +404,7 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({ profiles, curren
         <td>${formatDate(p.prevSurveyDate)}</td>
         <td>${tb.limitYears} лет</td>
         <td style="color: #b91c1c; font-weight: bold;">+${yearsOverdue > 0 ? yearsOverdue : 1} г.</td>
+        <td>${note}</td>
       </tr>`;
       });
       html += `
@@ -420,6 +425,7 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({ profiles, curren
         <th>№ Пути</th>
         <th>Специализация пути</th>
         <th>План. срок</th>
+        <th>Примечание (причины/что сделано)</th>
         <th>Ответственное предприятие</th>
       </tr>
     </thead>
@@ -427,6 +433,7 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({ profiles, curren
       overdueWorks.forEach(p => {
         const catLabel = p.category === 'alignment' ? 'Выправка' : 'Съемка';
         const spec = p.trackSpecialization || (p.trackType === 'main' ? 'Главный' : p.trackType === 'station' ? 'Приемо-отправочный' : 'Прочий');
+        const note = p.notes || '—';
         html += `
       <tr>
         <td><strong>${p.station}</strong></td>
@@ -434,6 +441,7 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({ profiles, curren
         <td>${p.trackNumber}</td>
         <td>${spec}</td>
         <td style="color: #b91c1c; font-weight: bold;">${formatDate(p.plannedDate)}</td>
+        <td>${note}</td>
         <td>${p.enterprise}</td>
       </tr>`;
       });

@@ -251,12 +251,33 @@ export const ExcelImporter: React.FC<ExcelImporterProps> = ({
     const rawExecutorName = getValue(['ответственный', 'инженер', 'исполнитель фио', 'executorname']);
     const executorName = rawExecutorName !== undefined && rawExecutorName !== null ? String(rawExecutorName).trim() : undefined;
 
-    const rawNotes = getValue([
-      'примечания', 'примечание', 'заметки', 'notes', 'комментарий', 'комментарии', 
-      'причины невыполнения', 'причины не выполнения', 'что сделано', 'описание причин', 'причина',
-      'примечание (достижение цели работ'
-    ]);
-    const notes = rawNotes !== undefined && rawNotes !== null && String(rawNotes).trim() !== '' ? String(rawNotes).trim() : undefined;
+    const extractNotes = (): string | undefined => {
+      const noteFields = [
+        'примечания', 'примечание', 'заметки', 'notes', 'комментарий', 'комментарии', 
+        'причины невыполнения', 'причины не выполнения', 'что сделано', 'описание причин', 'причина',
+        'примечание (достижение цели работ'
+      ];
+      const foundValues: string[] = [];
+      Object.keys(row).forEach(rk => {
+        const lowKey = rk.toLowerCase().trim();
+        const matches = noteFields.some(nf => lowKey === nf || lowKey.includes(nf));
+        if (matches) {
+          const val = row[rk];
+          if (val !== undefined && val !== null) {
+            const strVal = String(val).trim();
+            if (strVal && !foundValues.includes(strVal)) {
+              if (lowKey.includes('причин') || lowKey.includes('сделано') || lowKey.includes('комментар') || lowKey.includes('примечан')) {
+                foundValues.push(`${rk.trim()}: ${strVal}`);
+              } else {
+                foundValues.push(strVal);
+              }
+            }
+          }
+        }
+      });
+      return foundValues.length > 0 ? foundValues.join('; ') : undefined;
+    };
+    const notes = extractNotes();
 
     const generatedId = `excel-${Date.now()}-${index}-${Math.floor(Math.random() * 1000)}`;
 

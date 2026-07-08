@@ -562,6 +562,11 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
                               }
                             })()}
                           </div>
+                          {p.notes && (
+                            <div className="text-[11px] text-slate-600 bg-amber-50/40 border border-amber-200/40 rounded-lg p-2 mt-1.5 leading-relaxed max-w-sm">
+                              <span className="font-bold text-amber-800">Примечание:</span> {p.notes}
+                            </div>
+                          )}
                         </div>
                       </td>
 
