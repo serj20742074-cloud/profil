@@ -115,13 +115,19 @@ export const ExcelImporter: React.FC<ExcelImporterProps> = ({
       }
     }
 
-    const station = getValue(['станция', 'станция пути', 'station', 'наименование станции']) || 'Неизвестная станция';
-    const trackNumber = getValue(['номер пути', 'путь', 'tracknumber', 'track', 'путь №', '№№ путей', '№ путей']) || 'Путь не указан';
+    const rawStation = getValue(['станция', 'станция пути', 'station', 'наименование станции']);
+    const station = rawStation !== undefined && rawStation !== null ? String(rawStation).trim() : 'Неизвестная станция';
+
+    const rawTrackNumber = getValue(['номер пути', 'путь', 'tracknumber', 'track', 'путь №', '№№ путей', '№ путей']);
+    const trackNumber = rawTrackNumber !== undefined && rawTrackNumber !== null ? String(rawTrackNumber).trim() : 'Путь не указан';
+
     const trackType = getTrackType(getValue(['категория пути', 'категория', 'тип пути', 'тип', 'tracktype', 'специализация', 'назначение пути', 'специализация пути', 'назначение']), trackNumber);
     
     // Специализация пути (из файла или рассчитанная на основе ТРА)
-    let trackSpecialization = getValue(['специализация пути', 'специализация', 'назначение пути', 'назначение', 'категория пути', 'категория', 'тип пути', 'тип', 'tracktype', 'trackspecialization']) || '';
-    if (!trackSpecialization && trackNumber) {
+    const rawTrackSpecialization = getValue(['специализация пути', 'специализация', 'назначение пути', 'назначение', 'категория пути', 'категория', 'тип пути', 'тип', 'tracktype', 'trackspecialization']);
+    let trackSpecialization = rawTrackSpecialization !== undefined && rawTrackSpecialization !== null ? String(rawTrackSpecialization).trim() : '';
+
+    if (!trackSpecialization && trackNumber && trackNumber !== 'Путь не указан') {
       const low = trackNumber.toLowerCase();
       if (low.includes('главн') || low.includes('main') || ['i', 'ii', 'iii', 'iv', '1', '2', '3', '4'].includes(low.trim())) {
         trackSpecialization = 'Главный';
@@ -199,7 +205,8 @@ export const ExcelImporter: React.FC<ExcelImporterProps> = ({
       }
     }
     
-    const enterprise = getValue(['предприятие', 'исполнитель', 'пч', 'организация', 'enterprise']) || 'ПЧ (не указано)';
+    const rawEnterprise = getValue(['предприятие', 'исполнитель', 'пч', 'организация', 'enterprise']);
+    const enterprise = rawEnterprise !== undefined && rawEnterprise !== null ? String(rawEnterprise).trim() : 'ПЧ (не указано)';
     
     // Новые поля для Выправки и Съемки
     const pch = getValue(['пч', 'дистанция', 'pch']) || (typeof enterprise === 'string' && enterprise.startsWith('ПЧ') ? enterprise : undefined);
@@ -227,13 +234,25 @@ export const ExcelImporter: React.FC<ExcelImporterProps> = ({
       }
     }
     
-    const alignmentGoal = getValue(['цель работ', 'цель', 'alignmentgoal']);
-    const slopeBeforeAfter = getValue(['приведенный уклон', 'уклон до/после', 'slopebeforeafter', 'приведенный уклон пути до/после выправки']);
-    const tbBeforeAfter = getValue(['количество т/б', 'т/б до/после', 'tbbeforeafter', 'количество т/б до/после выправки']);
+    const rawAlignmentGoal = getValue(['цель работ', 'цель', 'alignmentgoal']);
+    const alignmentGoal = rawAlignmentGoal !== undefined && rawAlignmentGoal !== null ? String(rawAlignmentGoal).trim() : undefined;
+
+    const rawSlopeBeforeAfter = getValue(['приведенный уклон', 'уклон до/после', 'slopebeforeafter', 'приведенный уклон пути до/после выправки']);
+    const slopeBeforeAfter = rawSlopeBeforeAfter !== undefined && rawSlopeBeforeAfter !== null ? String(rawSlopeBeforeAfter).trim() : undefined;
+
+    const rawTbBeforeAfter = getValue(['количество т/б', 'т/б до/после', 'tbbeforeafter', 'количество т/б до/после выправки']);
+    const tbBeforeAfter = rawTbBeforeAfter !== undefined && rawTbBeforeAfter !== null ? String(rawTbBeforeAfter).trim() : undefined;
+
     const prevSurveyDate = parseDate(getValue(['дата предыдущей съемки', 'предыдущая съемка', 'prevsurveydate', 'дата предыдущей съемки']));
-    const traDocNumber = getValue(['номер распоряжения', 'приказ', 'акт', 'документ', 'tradocnumber', 'акт изменения в тра']);
-    const executorName = getValue(['ответственный', 'инженер', 'исполнитель фио', 'executorname']);
-    const notes = getValue(['примечания', 'примечание', 'заметки', 'notes', 'комментарий', 'примечание (достижение цели работ']);
+    
+    const rawTraDocNumber = getValue(['номер распоряжения', 'приказ', 'акт', 'документ', 'tradocnumber', 'акт изменения в тра']);
+    const traDocNumber = rawTraDocNumber !== undefined && rawTraDocNumber !== null ? String(rawTraDocNumber).trim() : undefined;
+
+    const rawExecutorName = getValue(['ответственный', 'инженер', 'исполнитель фио', 'executorname']);
+    const executorName = rawExecutorName !== undefined && rawExecutorName !== null ? String(rawExecutorName).trim() : undefined;
+
+    const rawNotes = getValue(['примечания', 'примечание', 'заметки', 'notes', 'комментарий', 'примечание (достижение цели работ']);
+    const notes = rawNotes !== undefined && rawNotes !== null ? String(rawNotes).trim() : undefined;
 
     const generatedId = `excel-${Date.now()}-${index}-${Math.floor(Math.random() * 1000)}`;
 
@@ -306,8 +325,9 @@ export const ExcelImporter: React.FC<ExcelImporterProps> = ({
 
         setParsedRows(allProfiles);
         setMappedProfiles(allProfiles);
-      } catch (err) {
-        setError('Не удалось прочитать файл. Убедитесь, что это корректный файл Excel (.xlsx, .xls).');
+      } catch (err: any) {
+        console.error('Excel parsing error:', err);
+        setError(`Не удалось прочитать файл. Ошибка: ${err?.message || err}. Убедитесь, что это корректный файл Excel (.xlsx, .xls).`);
       }
     };
     reader.readAsArrayBuffer(selectedFile);
