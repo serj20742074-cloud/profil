@@ -2,10 +2,11 @@ import React from 'react';
 import { 
   Search, Filter, Check, Clock, Play, FileCheck, CheckCircle2, 
   AlertTriangle, Calendar, Edit, Trash2, ArrowUpDown, RefreshCw, Plus, X,
-  FileSpreadsheet
+  FileSpreadsheet, ShieldAlert
 } from 'lucide-react';
 import { TrackProfile, ProfileStatus } from '../types';
 import { ExcelImporter } from './ExcelImporter';
+import { formatDate, getTbProhibitionStatus } from '../utils';
 
 interface ProfileTableProps {
   profiles: TrackProfile[];
@@ -15,6 +16,8 @@ interface ProfileTableProps {
   onAddProfileClick: () => void;
   onQuickStatusChange: (profileId: string, nextStatus: ProfileStatus, dates: { [key: string]: string; doc?: string }) => void;
   onImportProfiles: (newProfiles: TrackProfile[], strategy: 'append' | 'overwrite') => void;
+  initialFilters?: any;
+  clearInitialFilters?: () => void;
 }
 
 export const ProfileTable: React.FC<ProfileTableProps> = ({
@@ -24,9 +27,12 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
   onDeleteProfile,
   onAddProfileClick,
   onQuickStatusChange,
-  onImportProfiles
+  onImportProfiles,
+  initialFilters,
+  clearInitialFilters
 }) => {
   const currentDate = '2026-07-03';
+  const [categoryTab, setCategoryTab] = React.useState<'all' | 'survey' | 'alignment'>('all');
 
   // Состояния фильтрации и поиска
   const [search, setSearch] = React.useState('');
@@ -35,6 +41,13 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
   const [trackTypeFilter, setTrackTypeFilter] = React.useState<string>('all');
   const [monthFilter, setMonthFilter] = React.useState<string>('all');
   const [overdueFilter, setOverdueFilter] = React.useState<boolean>(false);
+  const [tbForbiddenFilter, setTbForbiddenFilter] = React.useState<boolean>(false);
+  const [upcomingFilter, setUpcomingFilter] = React.useState<boolean>(false);
+  const [tbResolvedFilter, setTbResolvedFilter] = React.useState<boolean>(false);
+
+  // Сортировка (по умолчанию по плановому сроку)
+  const [sortField, setSortField] = React.useState<'plannedDate' | 'station'>('plannedDate');
+  const [sortDirection, setSortDirection] = React.useState<'asc' | 'desc'>('asc');
 
   // Состояние импорта Excel
   const [isExcelImportOpen, setIsExcelImportOpen] = React.useState(false);
@@ -57,15 +70,19 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
     return Array.from(list);
   }, [profiles]);
 
-  // Фильтрация данных
+  // Фильтрация и сортировка данных
   const filteredProfiles = React.useMemo(() => {
-    return profiles.filter(p => {
+    const list = profiles.filter(p => {
+      // Фильтр по категории
+      if (categoryTab !== 'all' && p.category !== categoryTab) return false;
+
       // Поиск
       const matchesSearch = 
         p.station.toLowerCase().includes(search.toLowerCase()) ||
-        p.trackNumber.toLowerCase().includes(search.toLowerCase()) ||
+        String(p.trackNumber || '').toLowerCase().includes(search.toLowerCase()) ||
         (p.notes && p.notes.toLowerCase().includes(search.toLowerCase())) ||
-        (p.executorName && p.executorName.toLowerCase().includes(search.toLowerCase()));
+        (p.executorName && p.executorName.toLowerCase().includes(search.toLowerCase())) ||
+        (p.alignmentGoal && p.alignmentGoal.toLowerCase().includes(search.toLowerCase()));
       
       // Фильтр статусов
       const matchesStatus = statusFilter === 'all' || p.status === statusFilter;
@@ -77,16 +94,47 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
       const matchesTrackType = trackTypeFilter === 'all' || p.trackType === trackTypeFilter;
 
       // Фильтр месяцев
-      const pMonth = p.plannedDate.substring(5, 7);
+      const pMonth = p.plannedDate ? p.plannedDate.substring(5, 7) : '';
       const matchesMonth = monthFilter === 'all' || pMonth === monthFilter;
 
       // Фильтр просроченных
-      const isOverdue = p.status === 'planned' && p.plannedDate < currentDate;
+      const isOverdue = p.status === 'planned' && p.plannedDate && p.plannedDate < currentDate;
       const matchesOverdue = !overdueFilter || isOverdue;
 
-      return matchesSearch && matchesStatus && matchesEnterprise && matchesTrackType && matchesMonth && matchesOverdue;
+      // Фильтр запрета тормозных башмаков
+      const isTbForbidden = getTbProhibitionStatus(p, currentDate).isActive;
+      const matchesTbForbidden = !tbForbiddenFilter || isTbForbidden;
+
+      // Фильтр предстоящих 15 дней
+      const matchesUpcoming = !upcomingFilter || (p.status === 'planned' && p.plannedDate && (() => {
+        const pDate = new Date(p.plannedDate);
+        const cDate = new Date(currentDate);
+        const diffTime = pDate.getTime() - cDate.getTime();
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        return diffDays >= 0 && diffDays <= 15;
+      })());
+
+      // Фильтр снятых запретов ТБ
+      const isTbResolved = getTbProhibitionStatus(p, currentDate).isResolved;
+      const matchesTbResolved = !tbResolvedFilter || isTbResolved;
+
+      return matchesSearch && matchesStatus && matchesEnterprise && matchesTrackType && matchesMonth && matchesOverdue && matchesTbForbidden && matchesUpcoming && matchesTbResolved;
     });
-  }, [profiles, search, statusFilter, enterpriseFilter, trackTypeFilter, monthFilter, overdueFilter]);
+
+    // Сортировка по выбранному полю и направлению
+    return list.sort((a, b) => {
+      const valA = a[sortField] || '';
+      const valB = b[sortField] || '';
+
+      if (sortField === 'plannedDate') {
+        if (!valA) return sortDirection === 'asc' ? 1 : -1;
+        if (!valB) return sortDirection === 'asc' ? -1 : 1;
+      }
+
+      const comparison = String(valA).localeCompare(String(valB), 'ru');
+      return sortDirection === 'asc' ? comparison : -comparison;
+    });
+  }, [profiles, categoryTab, search, statusFilter, enterpriseFilter, trackTypeFilter, monthFilter, overdueFilter, tbForbiddenFilter, upcomingFilter, tbResolvedFilter, sortField, sortDirection]);
 
   // Обработка быстрой смены статуса
   const handleOpenQuickAction = (profile: TrackProfile) => {
@@ -103,7 +151,12 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
 
     if (quickActionProfile.status === 'planned') {
       nextStatus = 'shot';
-      dates.actualShotDate = quickDateValue;
+      if (quickActionProfile.category === 'alignment') {
+        dates.actualAlignmentDate = quickDateValue;
+        dates.actualShotDate = quickDateValue;
+      } else {
+        dates.actualShotDate = quickDateValue;
+      }
     } else if (quickActionProfile.status === 'shot') {
       nextStatus = 'approved';
       dates.approvalDate = quickDateValue;
@@ -127,7 +180,41 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
     setTrackTypeFilter('all');
     setMonthFilter('all');
     setOverdueFilter(false);
+    setTbForbiddenFilter(false);
+    setUpcomingFilter(false);
+    setTbResolvedFilter(false);
   };
+
+  // Эффект для применения фильтров, переданных из дашборда
+  React.useEffect(() => {
+    if (initialFilters) {
+      if (initialFilters.categoryTab !== undefined) {
+        setCategoryTab(initialFilters.categoryTab);
+      }
+      if (initialFilters.search !== undefined) {
+        setSearch(initialFilters.search);
+      }
+      if (initialFilters.statusFilter !== undefined) {
+        setStatusFilter(initialFilters.statusFilter);
+      }
+      if (initialFilters.overdueFilter !== undefined) {
+        setOverdueFilter(initialFilters.overdueFilter);
+      }
+      if (initialFilters.tbForbiddenFilter !== undefined) {
+        setTbForbiddenFilter(initialFilters.tbForbiddenFilter);
+      }
+      if (initialFilters.upcomingFilter !== undefined) {
+        setUpcomingFilter(initialFilters.upcomingFilter);
+      }
+      if (initialFilters.tbResolvedFilter !== undefined) {
+        setTbResolvedFilter(initialFilters.tbResolvedFilter);
+      }
+      
+      if (clearInitialFilters) {
+        clearInitialFilters();
+      }
+    }
+  }, [initialFilters, clearInitialFilters]);
 
   // Месяцы для фильтрации
   const months = [
@@ -147,6 +234,40 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
 
   return (
     <div className="space-y-4">
+      {/* Селектор программ в верхней части таблицы */}
+      <div className="flex bg-slate-100 p-1.5 rounded-2xl w-full max-w-lg border border-slate-200">
+        <button
+          onClick={() => { setCategoryTab('all'); handleResetFilters(); }}
+          className={`flex-1 text-center font-bold text-xs py-2.5 rounded-xl transition-all cursor-pointer ${
+            categoryTab === 'all' 
+              ? 'bg-white text-slate-800 shadow-sm' 
+              : 'text-slate-600 hover:text-slate-800'
+          }`}
+        >
+          Все объекты ({profiles.length})
+        </button>
+        <button
+          onClick={() => { setCategoryTab('survey'); handleResetFilters(); }}
+          className={`flex-1 text-center font-bold text-xs py-2.5 rounded-xl transition-all cursor-pointer ${
+            categoryTab === 'survey' 
+              ? 'bg-blue-600 text-white shadow-sm' 
+              : 'text-slate-600 hover:text-slate-800'
+          }`}
+        >
+          1. Съемка ({profiles.filter(p => p.category === 'survey').length})
+        </button>
+        <button
+          onClick={() => { setCategoryTab('alignment'); handleResetFilters(); }}
+          className={`flex-1 text-center font-bold text-xs py-2.5 rounded-xl transition-all cursor-pointer ${
+            categoryTab === 'alignment' 
+              ? 'bg-emerald-600 text-white shadow-sm' 
+              : 'text-slate-600 hover:text-slate-800'
+          }`}
+        >
+          2. Выправка ({profiles.filter(p => p.category === 'alignment').length})
+        </button>
+      </div>
+
       {/* Панель фильтров и управления */}
       <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-4">
         
@@ -156,7 +277,7 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4.5 h-4.5 text-slate-400" />
             <input 
               type="text" 
-              placeholder="Поиск по станции, пути, примечаниям или исполнителю..."
+              placeholder={categoryTab === 'alignment' ? "Поиск по станции, пути, цели выправки, примечаниям..." : "Поиск по станции, пути, примечаниям или исполнителю..."}
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-slate-800"
@@ -181,11 +302,11 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
         </div>
 
         {/* Сетка фильтров */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 border-t border-slate-100 pt-4">
+        <div className="grid grid-cols-2 md:grid-cols-6 gap-3 border-t border-slate-100 pt-4">
           
           {/* Статус */}
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Статус съемки</label>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Статус выполнения</label>
             <select 
               value={statusFilter} 
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -193,7 +314,7 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
             >
               <option value="all">Все статусы</option>
               <option value="planned">В плане</option>
-              <option value="shot">Съемка выполнена</option>
+              <option value="shot">{categoryTab === 'alignment' ? 'Выправлено' : 'Съемка выполнена'}</option>
               <option value="approved">Утверждено</option>
               <option value="tra_updated">Внесено в ТРА</option>
             </select>
@@ -201,7 +322,7 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
 
           {/* Предприятие */}
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Исполнитель съемки</label>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Исполнитель/Дистанция</label>
             <select 
               value={enterpriseFilter} 
               onChange={(e) => setEnterpriseFilter(e.target.value)}
@@ -231,7 +352,7 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
 
           {/* Месяц планирования */}
           <div className="space-y-1">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Месяц съемки (План)</label>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Месяц по плану</label>
             <select 
               value={monthFilter} 
               onChange={(e) => setMonthFilter(e.target.value)}
@@ -244,26 +365,67 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
             </select>
           </div>
 
-          {/* Чекбокс просрочки */}
-          <div className="flex items-end pb-1.5 pl-2">
-            <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-600 select-none">
-              <input 
-                type="checkbox" 
-                checked={overdueFilter} 
-                onChange={(e) => setOverdueFilter(e.target.checked)}
-                className="rounded text-blue-600 focus:ring-blue-500 border-slate-300 w-4 h-4"
-              />
-              <span className="flex items-center gap-1 text-red-600">
-                <AlertTriangle className="w-3.5 h-3.5" />
-                Только просроченные
-              </span>
-            </label>
+          {/* Чекбоксы контроля */}
+          <div className="flex flex-col justify-end gap-1.5 pb-1 pl-2 col-span-2 md:col-span-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-600 select-none">
+                <input 
+                  type="checkbox" 
+                  checked={overdueFilter} 
+                  onChange={(e) => setOverdueFilter(e.target.checked)}
+                  className="rounded text-blue-600 focus:ring-blue-500 border-slate-300 w-4 h-4"
+                />
+                <span className="flex items-center gap-1 text-red-600">
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                  Только просроченные
+                </span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-600 select-none">
+                <input 
+                  type="checkbox" 
+                  checked={tbForbiddenFilter} 
+                  onChange={(e) => setTbForbiddenFilter(e.target.checked)}
+                  className="rounded text-rose-600 focus:ring-rose-500 border-slate-300 w-4 h-4"
+                />
+                <span className="flex items-center gap-1 text-rose-600 font-bold" title="Съемка просрочена на 10+ лет: закрепление вагонов ТБ ЗАПРЕЩЕНО!">
+                  <ShieldAlert className="w-3.5 h-3.5 shrink-0 text-rose-600" />
+                  Запрет закрепления ТБ
+                </span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-600 select-none">
+                <input 
+                  type="checkbox" 
+                  checked={upcomingFilter} 
+                  onChange={(e) => setUpcomingFilter(e.target.checked)}
+                  className="rounded text-amber-600 focus:ring-amber-500 border-slate-300 w-4 h-4"
+                />
+                <span className="flex items-center gap-1 text-amber-600 font-bold" title="Работы, плановый срок которых наступает в ближайшие 15 дней">
+                  <Clock className="w-3.5 h-3.5 shrink-0 text-amber-500" />
+                  Ближайшие 15 дней
+                </span>
+              </label>
+
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-600 select-none">
+                <input 
+                  type="checkbox" 
+                  checked={tbResolvedFilter} 
+                  onChange={(e) => setTbResolvedFilter(e.target.checked)}
+                  className="rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 w-4 h-4"
+                />
+                <span className="flex items-center gap-1 text-emerald-600 font-bold" title="Ранее действовавший запрет на закрепление вагонов ТБ успешно снят">
+                  <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-emerald-500" />
+                  Снятые запреты ТБ
+                </span>
+              </label>
+            </div>
           </div>
 
         </div>
 
-        {/* Кнопка сброса при активных фильтрах */}
-        {(search || statusFilter !== 'all' || enterpriseFilter !== 'all' || trackTypeFilter !== 'all' || monthFilter !== 'all' || overdueFilter) && (
+        {/* Кнопка сброса при active фильтрах */}
+        {(search || statusFilter !== 'all' || enterpriseFilter !== 'all' || trackTypeFilter !== 'all' || monthFilter !== 'all' || overdueFilter || tbForbiddenFilter || upcomingFilter || tbResolvedFilter) && (
           <div className="flex justify-end pt-1">
             <button 
               onClick={handleResetFilters}
@@ -279,14 +441,47 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
       {/* Список программных профилей (Таблица) */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1000px] text-left border-collapse">
+          <table className="w-full min-w-[1100px] text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                <th className="py-4 px-5">Станция</th>
+              <tr className="bg-slate-50 border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase tracking-wider select-none">
+                <th 
+                  onClick={() => {
+                    if (sortField === 'station') {
+                      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+                    } else {
+                      setSortField('station');
+                      setSortDirection('asc');
+                    }
+                  }}
+                  className="py-4 px-5 cursor-pointer hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Станция</span>
+                    <ArrowUpDown className={`w-3.5 h-3.5 ${sortField === 'station' ? 'text-blue-600' : 'text-slate-300'}`} />
+                  </div>
+                </th>
                 <th className="py-4 px-4">Путь</th>
+                {categoryTab === 'all' && <th className="py-4 px-4">Программа</th>}
+                <th className="py-4 px-4">Объем (км)</th>
                 <th className="py-4 px-4">Исполнитель</th>
-                <th className="py-4 px-4">Плановая дата</th>
-                <th className="py-4 px-4 text-center">Контроль съемки</th>
+                {categoryTab === 'alignment' && <th className="py-4 px-4">Цель / Уклон / ТБ</th>}
+                <th 
+                  onClick={() => {
+                    if (sortField === 'plannedDate') {
+                      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+                    } else {
+                      setSortField('plannedDate');
+                      setSortDirection('asc');
+                    }
+                  }}
+                  className="py-4 px-4 cursor-pointer hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                >
+                  <div className="flex items-center gap-1.5">
+                    <span>Плановый срок</span>
+                    <ArrowUpDown className={`w-3.5 h-3.5 ${sortField === 'plannedDate' ? 'text-blue-600' : 'text-slate-300'}`} />
+                  </div>
+                </th>
+                <th className="py-4 px-4 text-center">Контроль</th>
                 <th className="py-4 px-4">Статус</th>
                 <th className="py-4 px-4">Этапы выполнения</th>
                 <th className="py-4 px-5 text-right">Действия</th>
@@ -295,7 +490,7 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
             <tbody className="divide-y divide-slate-100 text-sm">
               {filteredProfiles.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-slate-400">
+                  <td colSpan={11} className="py-12 text-center text-slate-400">
                     <AlertTriangle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
                     <p className="font-semibold">Объекты с заданными параметрами фильтрации не найдены</p>
                     <p className="text-xs mt-1">Попробуйте изменить поисковый запрос или сбросить фильтры</p>
@@ -303,10 +498,11 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
                 </tr>
               ) : (
                 filteredProfiles.map((p) => {
-                  const isOverdue = p.status === 'planned' && p.plannedDate < currentDate;
+                  const isDateValid = p.plannedDate && /^\d{4}-\d{2}-\d{2}$/.test(p.plannedDate);
+                  const isOverdue = p.status === 'planned' && isDateValid && p.plannedDate < currentDate;
                   
                   // Расчет дней оставшихся/просроченных
-                  const pDate = new Date(p.plannedDate);
+                  const pDate = new Date(isDateValid ? p.plannedDate : currentDate);
                   const cDate = new Date(currentDate);
                   const diffTime = pDate.getTime() - cDate.getTime();
                   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -328,9 +524,9 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
 
                       {/* Номер пути */}
                       <td className="py-4 px-4">
-                        <div className="space-y-0.5">
-                          <span className="font-semibold text-slate-700">{p.trackNumber}</span>
-                          <div>
+                        <div className="space-y-1">
+                          <span className="font-semibold text-slate-700 block">{p.trackNumber}</span>
+                          <div className="flex flex-wrap gap-1.5 items-center">
                             <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold inline-block uppercase tracking-wider ${
                               p.trackType === 'main' 
                                 ? 'bg-indigo-50 text-indigo-600' 
@@ -338,22 +534,93 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
                                   ? 'bg-amber-50 text-amber-600' 
                                   : 'bg-slate-100 text-slate-600'
                             }`}>
-                              {p.trackType === 'main' ? 'Главный' : p.trackType === 'station' ? 'Станционный' : 'Прочий'}
+                              {p.trackSpecialization || (p.trackType === 'main' ? 'Главный' : p.trackType === 'station' ? 'Приемо-отправочный' : 'Прочий')}
                             </span>
+
+                            {p.prevSurveyDate && (() => {
+                              const tbStatus = getTbProhibitionStatus(p, currentDate);
+                              if (tbStatus.isActive) {
+                                return (
+                                  <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-700 text-[10px] font-black px-2 py-0.5 rounded border border-rose-100 animate-pulse" title={`Съемка (профиль) просрочена на ${tbStatus.limitYears}+ ${tbStatus.limitYears === 3 ? 'года' : 'лет'}. Закрепление тормозными башмаками ЗАПРЕЩЕНО.`}>
+                                    <ShieldAlert className="w-3 h-3 text-rose-500 shrink-0" />
+                                    <span>ЗАПРЕТ ТБ (Пред. {formatDate(p.prevSurveyDate)})</span>
+                                  </span>
+                                );
+                              } else if (tbStatus.isResolved) {
+                                return (
+                                  <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded border border-emerald-100" title={`Ранее было нарушение (просрочено на ${tbStatus.limitYears} ${tbStatus.limitYears === 3 ? 'года' : 'лет'}), но новый профиль утвержден и внесен в ТРА. Запрет успешно СНЯТ.`}>
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-500 shrink-0" />
+                                    <span>ЗАПРЕТ СНЯТ (Пред. {formatDate(p.prevSurveyDate)})</span>
+                                  </span>
+                                );
+                              } else {
+                                return (
+                                  <span className="text-[10px] text-slate-500 bg-slate-50 border border-slate-100 px-1.5 py-0.5 rounded">
+                                    Пред: {formatDate(p.prevSurveyDate)}
+                                  </span>
+                                );
+                              }
+                            })()}
                           </div>
                         </div>
                       </td>
 
-                      {/* Предприятие */}
-                      <td className="py-4 px-4 text-slate-600 text-xs">
-                        {p.enterprise}
+                      {/* Программа (только на вкладке "Все") */}
+                      {categoryTab === 'all' && (
+                        <td className="py-4 px-4">
+                          <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase px-2.5 py-1 rounded-full border ${
+                            p.category === 'alignment'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-blue-50 text-blue-700 border-blue-200'
+                          }`}>
+                            {p.category === 'alignment' ? 'Выправка' : 'Съемка'}
+                          </span>
+                        </td>
+                      )}
+
+                      {/* Объем */}
+                      <td className="py-4 px-4 font-mono text-xs font-semibold">
+                        {p.category === 'alignment' ? (
+                          <div className="space-y-0.5">
+                            <span className="text-slate-700 block">План: {p.workVolume || 0} км</span>
+                            <span className="text-emerald-600 block">Факт: {p.completedVolume || 0} км</span>
+                          </div>
+                        ) : (
+                          <span className="text-slate-700">{p.workVolume || '—'} км</span>
+                        )}
                       </td>
+
+                      {/* Исполнитель */}
+                      <td className="py-4 px-4 text-slate-600 text-xs">
+                        <div className="font-medium">{p.enterprise || p.pch || 'Не указано'}</div>
+                        {p.executorName && <div className="text-[10px] text-slate-400 mt-0.5">Отв: {p.executorName}</div>}
+                      </td>
+
+                      {/* Цель / Уклоны / ТБ для выправки */}
+                      {categoryTab === 'alignment' && (
+                        <td className="py-4 px-4 text-xs space-y-1">
+                          {p.alignmentGoal && (
+                            <div><span className="text-slate-400 font-semibold">Цель:</span> <span className="text-slate-700 font-medium">{p.alignmentGoal}</span></div>
+                          )}
+                          {p.slopeBeforeAfter && (
+                            <div><span className="text-slate-400">Уклон:</span> <span className="font-mono text-slate-600">{p.slopeBeforeAfter}</span></div>
+                          )}
+                          {p.tbBeforeAfter && (
+                            <div><span className="text-slate-400">Т/Б:</span> <span className="font-mono text-slate-600">{p.tbBeforeAfter}</span></div>
+                          )}
+                        </td>
+                      )}
 
                       {/* Плановая дата */}
                       <td className="py-4 px-4 font-semibold text-slate-700">
                         <div className="flex items-center gap-1.5">
                           <Calendar className="w-3.5 h-3.5 text-slate-400" />
-                          <span>{p.plannedDate}</span>
+                          <div>
+                            <span>{p.quarter || p.plannedDate || '—'}</span>
+                            {p.quarter && p.plannedDate && p.quarter !== p.plannedDate && (
+                              <div className="text-[10px] text-slate-400 font-normal mt-0.5">({p.plannedDate})</div>
+                            )}
+                          </div>
                         </div>
                       </td>
 
@@ -375,8 +642,8 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
                           )
                         ) : (
                           // Сравнение фактической даты с плановой
-                          p.actualShotDate && (
-                            p.actualShotDate <= p.plannedDate ? (
+                          (p.category === 'alignment' ? p.actualAlignmentDate : p.actualShotDate) && (
+                            (p.category === 'alignment' ? p.actualAlignmentDate : p.actualShotDate)! <= p.plannedDate ? (
                               <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-600 text-xs font-bold px-2 py-1 rounded-full">
                                 <Check className="w-3.5 h-3.5" />
                                 В срок
@@ -399,9 +666,13 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
                           </span>
                         )}
                         {p.status === 'shot' && (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-blue-50 text-blue-600 border border-blue-200">
-                            <Play className="w-3.5 h-3.5 text-blue-500" />
-                            Снято
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold border ${
+                            p.category === 'alignment'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                              : 'bg-blue-50 text-blue-600 border-blue-200'
+                          }`}>
+                            <Play className={`w-3.5 h-3.5 ${p.category === 'alignment' ? 'text-emerald-500' : 'text-blue-500'}`} />
+                            {p.category === 'alignment' ? 'Выправлено' : 'Снято'}
                           </span>
                         )}
                         {p.status === 'approved' && (
@@ -420,16 +691,27 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
 
                       {/* Даты жизненного цикла */}
                       <td className="py-4 px-4 text-xs space-y-1 text-slate-500">
-                        {p.actualShotDate && (
-                          <div><span className="font-medium text-slate-400">Съемка:</span> <span className="font-mono">{p.actualShotDate}</span></div>
+                        {p.category === 'alignment' ? (
+                          <>
+                            {p.actualAlignmentDate && (
+                              <div><span className="font-medium text-slate-400">Выправка:</span> <span className="font-mono">{formatDate(p.actualAlignmentDate)}</span></div>
+                            )}
+                            {p.actualShotDate && (
+                              <div><span className="font-medium text-slate-400">Съемка:</span> <span className="font-mono">{formatDate(p.actualShotDate)}</span></div>
+                            )}
+                          </>
+                        ) : (
+                          p.actualShotDate && (
+                            <div><span className="font-medium text-slate-400">Съемка:</span> <span className="font-mono">{formatDate(p.actualShotDate)}</span></div>
+                          )
                         )}
                         {p.approvalDate && (
-                          <div><span className="font-medium text-slate-400">Утвержден:</span> <span className="font-mono">{p.approvalDate}</span></div>
+                          <div><span className="font-medium text-slate-400">Утвержден:</span> <span className="font-mono">{formatDate(p.approvalDate)}</span></div>
                         )}
                         {p.traUpdateDate && (
-                          <div><span className="font-medium text-slate-400">ТРА изменен:</span> <span className="font-mono">{p.traUpdateDate}</span></div>
+                          <div><span className="font-medium text-slate-400">ТРА изменен:</span> <span className="font-mono">{formatDate(p.traUpdateDate)}</span></div>
                         )}
-                        {!p.actualShotDate && <span className="text-slate-400 font-medium">Работа еще не начата</span>}
+                        {!(p.category === 'alignment' ? p.actualAlignmentDate : p.actualShotDate) && <span className="text-slate-400 font-medium">Работа еще не начата</span>}
                       </td>
 
                       {/* Кнопки действий */}
@@ -442,14 +724,14 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
                               onClick={() => handleOpenQuickAction(p)}
                               title={
                                 p.status === 'planned' 
-                                  ? "Отметить съемку как выполненную" 
+                                  ? (p.category === 'alignment' ? "Отметить выправку как выполненную" : "Отметить съемку как выполненную")
                                   : p.status === 'shot' 
                                     ? "Отметить профиль как утвержденный" 
                                     : "Внести изменения в ТРА станции"
                               }
                               className={`p-1.5 rounded-lg border text-xs font-bold flex items-center gap-1 shadow-sm cursor-pointer ${
                                 p.status === 'planned' 
-                                  ? 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100' 
+                                  ? (p.category === 'alignment' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100')
                                   : p.status === 'shot' 
                                     ? 'bg-amber-50 text-amber-600 border-amber-200 hover:bg-amber-100' 
                                     : 'bg-emerald-50 text-emerald-600 border-emerald-200 hover:bg-emerald-100'
@@ -457,7 +739,7 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
                             >
                               <Check className="w-3.5 h-3.5" />
                               <span>
-                                {p.status === 'planned' ? 'Отснять' : p.status === 'shot' ? 'Утвердить' : 'ТРА'}
+                                {p.status === 'planned' ? (p.category === 'alignment' ? 'Выправить' : 'Отснять') : p.status === 'shot' ? 'Утвердить' : 'ТРА'}
                               </span>
                             </button>
                           )}
@@ -524,7 +806,7 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
                   <span className="block text-[10px] font-bold text-slate-400 uppercase">Текущий этап</span>
                   <span className="font-semibold text-slate-700">
                     {quickActionProfile.status === 'planned' && 'В плане'}
-                    {quickActionProfile.status === 'shot' && 'Съемка выполнена'}
+                    {quickActionProfile.status === 'shot' && (quickActionProfile.category === 'alignment' ? 'Выправлено' : 'Съемка выполнена')}
                     {quickActionProfile.status === 'approved' && 'Утверждено'}
                   </span>
                 </div>
@@ -532,9 +814,9 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
                 <div>
                   <span className="block text-[10px] font-bold text-slate-400 uppercase">Новый этап</span>
                   <span className="font-bold text-blue-600">
-                    {quickActionProfile.status === 'planned' && 'Съемка выполнена'}
-                    {quickActionProfile.status === 'shot' && 'Профиль утвержден'}
-                    {quickActionProfile.status === 'approved' && 'Изменения внесены в ТРА'}
+                    {quickActionProfile.status === 'planned' && (quickActionProfile.category === 'alignment' ? 'Выправлено' : 'Съемка выполнена')}
+                    {quickActionProfile.status === 'shot' && 'Утверждено'}
+                    {quickActionProfile.status === 'approved' && 'Внесено в ТРА'}
                   </span>
                 </div>
               </div>
@@ -543,8 +825,8 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
               <div className="space-y-3.5">
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-slate-500">
-                    {quickActionProfile.status === 'planned' && 'Укажите фактическую дату съемки профиля'}
-                    {quickActionProfile.status === 'shot' && 'Укажите дату утверждения профиля службой пути'}
+                    {quickActionProfile.status === 'planned' && (quickActionProfile.category === 'alignment' ? 'Укажите фактическую дату выправки пути' : 'Укажите фактическую дату съемки профиля')}
+                    {quickActionProfile.status === 'shot' && (quickActionProfile.category === 'alignment' ? 'Укажите дату утверждения выправки службой пути' : 'Укажите дату утверждения съемки службой пути')}
                     {quickActionProfile.status === 'approved' && 'Укажите дату утверждения ТРА станции'}
                   </label>
                   <input 

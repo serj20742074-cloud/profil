@@ -45,7 +45,7 @@ export const BackupManager: React.FC<BackupManagerProps> = ({
           // Простейшая проверка структуры объектов
           const isValid = parsed.every(item => item.station && item.trackNumber && item.plannedDate && item.status);
           if (isValid) {
-            onImportProfiles(parsed);
+            onImportProfiles(parsed, 'overwrite');
             setImportStatus({ type: 'success', message: 'Программа успешно импортирована из резервного файла!' });
           } else {
             setImportStatus({ type: 'error', message: 'Неверный формат данных. Убедитесь, что файл содержит корректные профили.' });
@@ -80,7 +80,7 @@ export const BackupManager: React.FC<BackupManagerProps> = ({
     ];
 
     const rows = profiles.map(p => {
-      const typeLabel = p.trackType === 'main' ? 'Главный' : p.trackType === 'station' ? 'Станционный' : 'Прочий';
+      const typeLabel = p.trackType === 'main' ? 'Главный' : p.trackType === 'station' ? 'Приемо-отправочный' : 'Прочий';
       let statusLabel = '';
       switch (p.status) {
         case 'planned': statusLabel = 'В плане'; break;

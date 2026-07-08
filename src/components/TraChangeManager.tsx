@@ -4,6 +4,7 @@ import {
   Search, FileCheck, Check, Calendar, Info, X
 } from 'lucide-react';
 import { TrackProfile, ProfileStatus } from '../types';
+import { formatDate } from '../utils';
 
 interface TraChangeManagerProps {
   profiles: TrackProfile[];
@@ -238,13 +239,13 @@ export const TraChangeManager: React.FC<TraChangeManagerProps> = ({
                     <div className="grid grid-cols-2 gap-3 text-xs border-t border-b border-slate-100/70 py-2.5">
                       <div>
                         <span className="text-slate-400 block font-medium">Дата уверждения:</span>
-                        <span className="font-bold text-slate-700 font-mono">{p.approvalDate}</span>
+                        <span className="font-bold text-slate-700 font-mono">{formatDate(p.approvalDate)}</span>
                       </div>
                       <div>
                         {isUpdated ? (
                           <>
                             <span className="text-slate-400 block font-medium">Дата изменения ТРА:</span>
-                            <span className="font-bold text-emerald-700 font-mono">{p.traUpdateDate}</span>
+                            <span className="font-bold text-emerald-700 font-mono">{formatDate(p.traUpdateDate)}</span>
                           </>
                         ) : (
                           <>

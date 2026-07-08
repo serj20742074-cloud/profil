@@ -11,6 +11,8 @@ import { ProfileTable } from './components/ProfileTable';
 import { ProfileForm } from './components/ProfileForm';
 import { TraChangeManager } from './components/TraChangeManager';
 import { BackupManager } from './components/BackupManager';
+import { MarkdownReport } from './components/MarkdownReport';
+import { formatDate, getTbProhibitionStatus } from './utils';
 
 export default function App() {
   const LOCAL_STORAGE_KEY = 'track_profiles_program_2026';
@@ -43,6 +45,7 @@ export default function App() {
 
   // 2. Вкладки навигации
   const [activeTab, setActiveTab] = React.useState<string>('dashboard');
+  const [initialFilters, setInitialFilters] = React.useState<any>(null);
 
   // 3. Состояния форм и деталей
   const [isFormOpen, setIsFormOpen] = React.useState(false);
@@ -110,6 +113,7 @@ export default function App() {
       };
 
       if (dates.actualShotDate) updated.actualShotDate = dates.actualShotDate;
+      if (dates.actualAlignmentDate) updated.actualAlignmentDate = dates.actualAlignmentDate;
       if (dates.approvalDate) updated.approvalDate = dates.approvalDate;
       if (dates.traUpdateDate) updated.traUpdateDate = dates.traUpdateDate;
       if (dates.doc) updated.traDocNumber = dates.doc;
@@ -159,7 +163,12 @@ export default function App() {
   };
 
   // Навигация из кликов по метрикам
-  const handleNavigateToTab = (tab: string) => {
+  const handleNavigateToTab = (tab: string, filters?: any) => {
+    if (filters) {
+      setInitialFilters(filters);
+    } else {
+      setInitialFilters(null);
+    }
     setActiveTab(tab);
   };
 
@@ -241,6 +250,18 @@ export default function App() {
             </button>
 
             <button
+              onClick={() => setActiveTab('reports')}
+              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs md:text-sm font-bold transition-all cursor-pointer ${
+                activeTab === 'reports' 
+                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200/30' 
+                  : 'text-slate-500 hover:text-slate-800'
+              }`}
+            >
+              <FileText className="w-4 h-4 text-emerald-600" />
+              <span>Анализ (Markdown)</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('backups')}
               className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs md:text-sm font-bold transition-all cursor-pointer ${
                 activeTab === 'backups' 
@@ -277,6 +298,8 @@ export default function App() {
             onAddProfileClick={handleAddProfileClick}
             onQuickStatusChange={handleQuickStatusChange}
             onImportProfiles={handleImportProfiles}
+            initialFilters={initialFilters}
+            clearInitialFilters={() => setInitialFilters(null)}
           />
         )}
 
@@ -293,6 +316,13 @@ export default function App() {
             profiles={profiles} 
             onImportProfiles={handleImportProfiles}
             onResetToDefault={handleResetToDefault}
+          />
+        )}
+
+        {activeTab === 'reports' && (
+          <MarkdownReport 
+            profiles={profiles} 
+            currentDate={currentDate}
           />
         )}
 
@@ -334,13 +364,20 @@ export default function App() {
               
               {/* Информация о пути */}
               <div className="space-y-1 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Железнодорожная Станция</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Железнодорожная Станция</span>
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase ${
+                    selectedProfile.category === 'alignment' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
+                  }`}>
+                    {selectedProfile.category === 'alignment' ? 'Выправка' : 'Съемка'}
+                  </span>
+                </div>
                 <span className="text-xl font-extrabold text-slate-900 block">{selectedProfile.station}</span>
                 <span className="text-sm font-semibold text-slate-600 block">{selectedProfile.trackNumber}</span>
                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold inline-block mt-1 uppercase ${
                   selectedProfile.trackType === 'main' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-600'
                 }`}>
-                  {selectedProfile.trackType === 'main' ? 'Главный путь' : selectedProfile.trackType === 'station' ? 'Станционный путь' : 'Специальный путь'}
+                  {selectedProfile.trackSpecialization ? `${selectedProfile.trackSpecialization} путь` : (selectedProfile.trackType === 'main' ? 'Главный путь' : selectedProfile.trackType === 'station' ? 'Приемо-отправочный путь' : 'Прочий путь')}
                 </span>
               </div>
 
@@ -355,21 +392,33 @@ export default function App() {
                     <span className="absolute -left-[31px] top-0.5 w-4.5 h-4.5 rounded-full bg-emerald-500 border-4 border-white flex items-center justify-center shadow-xs"></span>
                     <div>
                       <h5 className="font-bold text-slate-800 text-xs md:text-sm">Включение в план на 2026 г.</h5>
-                      <p className="text-xs text-slate-400 mt-0.5">Плановая съемка: <strong className="text-slate-600">{selectedProfile.plannedDate}</strong></p>
+                      <p className="text-xs text-slate-400 mt-0.5">
+                        {selectedProfile.category === 'alignment' ? 'Плановая выправка' : 'Плановая съемка'}: <strong className="text-slate-600">{formatDate(selectedProfile.plannedDate)}</strong>
+                      </p>
                     </div>
                   </div>
 
-                  {/* Шаг 2: Выполнение съемки */}
+                  {/* Шаг 2: Выполнение работы */}
                   <div className="relative">
                     <span className={`absolute -left-[31px] top-0.5 w-4.5 h-4.5 rounded-full border-4 border-white flex items-center justify-center shadow-xs ${
                       selectedProfile.status !== 'planned' ? 'bg-emerald-500' : 'bg-slate-300'
                     }`}></span>
                     <div>
-                      <h5 className="font-bold text-slate-800 text-xs md:text-sm">Фактическая съемка продольного профиля</h5>
-                      {selectedProfile.actualShotDate ? (
-                        <p className="text-xs text-emerald-600 font-semibold mt-0.5">Выполнено: {selectedProfile.actualShotDate}</p>
+                      <h5 className="font-bold text-slate-800 text-xs md:text-sm">
+                        {selectedProfile.category === 'alignment' ? 'Фактическое выполнение выправки' : 'Фактическая съемка продольного профиля'}
+                      </h5>
+                      {selectedProfile.category === 'alignment' ? (
+                        selectedProfile.actualAlignmentDate ? (
+                          <p className="text-xs text-emerald-600 font-semibold mt-0.5">Выправлено: {formatDate(selectedProfile.actualAlignmentDate)}</p>
+                        ) : (
+                          <p className="text-xs text-slate-400 mt-0.5">Ожидание выполнения выправки исполнителем</p>
+                        )
                       ) : (
-                        <p className="text-xs text-slate-400 mt-0.5">Ожидание выполнения съемки исполнителем</p>
+                        selectedProfile.actualShotDate ? (
+                          <p className="text-xs text-emerald-600 font-semibold mt-0.5">Снято: {formatDate(selectedProfile.actualShotDate)}</p>
+                        ) : (
+                          <p className="text-xs text-slate-400 mt-0.5">Ожидание выполнения съемки исполнителем</p>
+                        )
                       )}
                     </div>
                   </div>
@@ -380,11 +429,13 @@ export default function App() {
                       selectedProfile.status === 'approved' || selectedProfile.status === 'tra_updated' ? 'bg-emerald-500' : 'bg-slate-300'
                     }`}></span>
                     <div>
-                      <h5 className="font-bold text-slate-800 text-xs md:text-sm">Утверждение профиля службой пути</h5>
+                      <h5 className="font-bold text-slate-800 text-xs md:text-sm">
+                        {selectedProfile.category === 'alignment' ? 'Приемка и утверждение результатов выправки' : 'Утверждение профиля службой пути'}
+                      </h5>
                       {selectedProfile.approvalDate ? (
-                        <p className="text-xs text-emerald-600 font-semibold mt-0.5">Утвержден: {selectedProfile.approvalDate}</p>
+                        <p className="text-xs text-emerald-600 font-semibold mt-0.5">Утвержден: {formatDate(selectedProfile.approvalDate)}</p>
                       ) : (
-                        <p className="text-xs text-slate-400 mt-0.5">На рассмотрении / согласовании</p>
+                        <p className="text-xs text-slate-400 mt-0.5">На согласовании / приемке</p>
                       )}
                     </div>
                   </div>
@@ -398,7 +449,7 @@ export default function App() {
                       <h5 className="font-bold text-slate-800 text-xs md:text-sm">Внесение изменений в ТРА станции</h5>
                       {selectedProfile.traUpdateDate ? (
                         <div className="space-y-0.5 mt-0.5">
-                          <p className="text-xs text-emerald-600 font-semibold">Внесено в ТРА: {selectedProfile.traUpdateDate}</p>
+                           <p className="text-xs text-emerald-600 font-semibold">Внесено в ТРА: {formatDate(selectedProfile.traUpdateDate)}</p>
                           <p className="text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md inline-block font-mono">
                             Приказ/Акт: {selectedProfile.traDocNumber}
                           </p>
@@ -424,6 +475,76 @@ export default function App() {
                   <div className="flex justify-between py-1.5 border-b border-slate-50">
                     <span className="text-slate-400 font-semibold">Инженер-исполнитель:</span>
                     <span className="font-bold text-slate-800">{selectedProfile.executorName}</span>
+                  </div>
+                )}
+
+                {/* Объемы и параметры для выправки / съемки */}
+                {selectedProfile.workVolume !== undefined && (
+                  <div className="flex justify-between py-1.5 border-b border-slate-50">
+                    <span className="text-slate-400 font-semibold">Плановый объем (км):</span>
+                    <span className="font-bold text-slate-800">{selectedProfile.workVolume} км</span>
+                  </div>
+                )}
+
+                {selectedProfile.completedVolume !== undefined && (
+                  <div className="flex justify-between py-1.5 border-b border-slate-50">
+                    <span className="text-slate-400 font-semibold">Выполненный объем (км):</span>
+                    <span className="font-bold text-emerald-600">{selectedProfile.completedVolume} км</span>
+                  </div>
+                )}
+
+                {selectedProfile.category === 'alignment' && selectedProfile.alignmentGoal && (
+                  <div className="flex justify-between py-1.5 border-b border-slate-50">
+                    <span className="text-slate-400 font-semibold">Цель работ:</span>
+                    <span className="font-bold text-slate-800 text-right">{selectedProfile.alignmentGoal}</span>
+                  </div>
+                )}
+
+                {selectedProfile.category === 'alignment' && selectedProfile.slopeBeforeAfter && (
+                  <div className="flex justify-between py-1.5 border-b border-slate-50">
+                    <span className="text-slate-400 font-semibold">Уклон до/после (‰):</span>
+                    <span className="font-mono font-bold text-slate-800">{selectedProfile.slopeBeforeAfter}</span>
+                  </div>
+                )}
+
+                {selectedProfile.category === 'alignment' && selectedProfile.tbBeforeAfter && (
+                  <div className="flex justify-between py-1.5 border-b border-slate-50">
+                    <span className="text-slate-400 font-semibold">Количество т/б до/после:</span>
+                    <span className="font-mono font-bold text-slate-800">{selectedProfile.tbBeforeAfter}</span>
+                  </div>
+                )}
+
+                {selectedProfile.category === 'survey' && selectedProfile.prevSurveyDate && (
+                  <div className="space-y-1.5 py-1.5 border-b border-slate-50">
+                    <div className="flex justify-between">
+                      <span className="text-slate-400 font-semibold">Дата предыдущей съемки:</span>
+                      <span className="font-mono font-bold text-slate-800">{formatDate(selectedProfile.prevSurveyDate)}</span>
+                    </div>
+                    {(() => {
+                      const tbStatus = getTbProhibitionStatus(selectedProfile, currentDate);
+                      if (tbStatus.isActive) {
+                        return (
+                          <div className="bg-rose-50 text-rose-800 text-[11px] p-2.5 rounded-lg border border-rose-100 flex items-start gap-1.5 mt-1 leading-normal">
+                            <ShieldAlert className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-bold block text-rose-700">ЗАКРЕПЛЕНИЕ ТБ ЗАПРЕЩЕНО!</span>
+                              Срок действия предыдущей съемки ({formatDate(selectedProfile.prevSurveyDate)}) превысил {tbStatus.limitYears} {tbStatus.limitYears === 3 ? 'года' : 'лет'} (истек {formatDate(tbStatus.deadlineDateStr)}) для {selectedProfile.trackNumber.toLowerCase().includes('сортировоч') ? 'сортировочного' : 'данного'} пути. Закреплять вагоны тормозными башмаками на данном пути категорически запрещено!
+                            </div>
+                          </div>
+                        );
+                      } else if (tbStatus.isResolved) {
+                        return (
+                          <div className="bg-emerald-50 text-emerald-800 text-[11px] p-2.5 rounded-lg border border-emerald-100 flex items-start gap-1.5 mt-1 leading-normal">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                            <div>
+                              <span className="font-bold block text-emerald-700">ЗАПРЕТ ТБ СНЯТ (НАРУШЕНИЕ УСТРАНЕНО)!</span>
+                              Срок действия предыдущей съемки ({formatDate(selectedProfile.prevSurveyDate)}) превышал {tbStatus.limitYears} {tbStatus.limitYears === 3 ? 'года' : 'лет'} (истек {formatDate(tbStatus.deadlineDateStr)}), но сейчас новый профиль успешно утвержден и внесен в ТРА. Нарушение устранено, запрет на закрепление вагонов ТБ официально снят.
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                   </div>
                 )}
 

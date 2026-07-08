@@ -8,17 +8,51 @@ import {
   TrendingUp, BarChart2, ShieldAlert, ArrowRight, MapPin, Gauge
 } from 'lucide-react';
 import { TrackProfile, AnalyticsSummary } from '../types';
+import { formatDate, getTbProhibitionStatus } from '../utils';
 
 interface DashboardProps {
   profiles: TrackProfile[];
   onSelectProfile: (profileId: string) => void;
-  onNavigateToTab: (tab: string) => void;
+  onNavigateToTab: (tab: string, filters?: any) => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({ profiles, onSelectProfile, onNavigateToTab }) => {
   const currentDate = '2026-07-03'; // Фиксированная системная дата для расчетов контроля
+  const [categoryFilter, setCategoryFilter] = React.useState<'all' | 'survey' | 'alignment'>('all');
 
-  // 1. Вычисление метрик
+  // Фильтруем профили по выбранной категории
+  const filteredProfiles = React.useMemo(() => {
+    if (categoryFilter === 'all') return profiles;
+    return profiles.filter(p => p.category === categoryFilter);
+  }, [profiles, categoryFilter]);
+
+  // Вычисление километража для выправки
+  const alignmentKmStats = React.useMemo(() => {
+    const alignmentProfiles = profiles.filter(p => p.category === 'alignment');
+    const plannedKm = alignmentProfiles.reduce((sum, p) => sum + (p.workVolume || 0), 0);
+    const completedKm = alignmentProfiles.reduce((sum, p) => sum + (p.completedVolume || 0), 0);
+    return {
+      plannedKm: parseFloat(plannedKm.toFixed(3)),
+      completedKm: parseFloat(completedKm.toFixed(3)),
+      percent: plannedKm > 0 ? Math.round((completedKm / plannedKm) * 100) : 0
+    };
+  }, [profiles]);
+
+  // Вычисление километража для съемки
+  const surveyKmStats = React.useMemo(() => {
+    const surveyProfiles = profiles.filter(p => p.category === 'survey');
+    const plannedKm = surveyProfiles.reduce((sum, p) => sum + (p.workVolume || 0), 0);
+    const completedKm = surveyProfiles
+      .filter(p => p.status === 'tra_updated' || p.status === 'approved')
+      .reduce((sum, p) => sum + (p.workVolume || 0), 0);
+    return {
+      plannedKm: parseFloat(plannedKm.toFixed(3)),
+      completedKm: parseFloat(completedKm.toFixed(3)),
+      percent: plannedKm > 0 ? Math.round((completedKm / plannedKm) * 100) : 0
+    };
+  }, [profiles]);
+
+  // 1. Вычисление метрик для отфильтрованных профилей
   const summary = React.useMemo<AnalyticsSummary>(() => {
     let planned = 0;
     let shot = 0;
@@ -27,15 +61,15 @@ export const Dashboard: React.FC<DashboardProps> = ({ profiles, onSelectProfile,
     let overdue = 0;
     let upcoming = 0;
 
-    profiles.forEach(p => {
+    filteredProfiles.forEach(p => {
       // Подсчет по статусам
       if (p.status === 'planned') {
         planned++;
         
         // Проверка просрочки
-        if (p.plannedDate < currentDate) {
+        if (p.plannedDate && p.plannedDate < currentDate) {
           overdue++;
-        } else {
+        } else if (p.plannedDate) {
           // Проверка предстоящих (ближайшие 15 дней)
           const pDate = new Date(p.plannedDate);
           const cDate = new Date(currentDate);
@@ -55,7 +89,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ profiles, onSelectProfile,
     });
 
     return {
-      total: profiles.length,
+      total: filteredProfiles.length,
       planned,
       shot,
       approved,
@@ -63,7 +97,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ profiles, onSelectProfile,
       overdue,
       upcoming
     };
-  }, [profiles]);
+  }, [filteredProfiles]);
 
   // 2. Данные для графика выполнения плана по месяцам
   const monthlyChartData = React.useMemo(() => {
@@ -82,34 +116,36 @@ export const Dashboard: React.FC<DashboardProps> = ({ profiles, onSelectProfile,
       { name: 'Дек', code: '12', planned: 0, actual: 0 },
     ];
 
-    profiles.forEach(p => {
+    filteredProfiles.forEach(p => {
       // Плановые месяцы
-      const planMonthStr = p.plannedDate.substring(5, 7);
-      const planMonthObj = months.find(m => m.code === planMonthStr);
-      if (planMonthObj) {
-        planMonthObj.planned += 1;
+      if (p.plannedDate) {
+        const planMonthStr = p.plannedDate.substring(5, 7);
+        const planMonthObj = months.find(m => m.code === planMonthStr);
+        if (planMonthObj) {
+          planMonthObj.planned += 1;
+        }
       }
 
-      // Фактически выполненная съемка (если статус не 'planned')
-      if (p.status !== 'planned' && p.actualShotDate) {
-        const shotMonthStr = p.actualShotDate.substring(5, 7);
-        const shotMonthObj = months.find(m => m.code === shotMonthStr);
-        if (shotMonthObj) {
-          shotMonthObj.actual += 1;
+      // Фактически выполненная съемка или выправка
+      const actualDate = p.category === 'alignment' ? p.actualAlignmentDate : p.actualShotDate;
+      if (p.status !== 'planned' && actualDate) {
+        const actMonthStr = actualDate.substring(5, 7);
+        const actMonthObj = months.find(m => m.code === actMonthStr);
+        if (actMonthObj) {
+          actMonthObj.actual += 1;
         }
       }
     });
 
     return months;
-  }, [profiles]);
+  }, [filteredProfiles]);
 
   // 3. Данные по предприятиям
   const enterpriseChartData = React.useMemo(() => {
     const counts: { [key: string]: { name: string; completed: number; pending: number; total: number } } = {};
     
-    profiles.forEach(p => {
-      const ent = p.enterprise || 'Не указано';
-      // Сократим длинные имена для графика
+    filteredProfiles.forEach(p => {
+      const ent = p.pch || p.enterprise || 'Не указано';
       const shortName = ent.replace(' дистанция пути', '').replace('Путевая машинная станция', 'ПМС').replace('Проектно-изыскательская партия', 'ПИП');
 
       if (!counts[shortName]) {
@@ -125,26 +161,27 @@ export const Dashboard: React.FC<DashboardProps> = ({ profiles, onSelectProfile,
     });
 
     return Object.values(counts);
-  }, [profiles]);
+  }, [filteredProfiles]);
 
   // 4. Распределение по статусам для круговой диаграммы
   const statusPieData = React.useMemo(() => {
-    return [
+    const statuses = [
       { name: 'В плане', value: summary.planned - summary.overdue, color: '#94A3B8' }, // Slate-400
       { name: 'Просрочено', value: summary.overdue, color: '#EF4444' }, // Red-500
-      { name: 'Снято (на согласовании)', value: summary.shot, color: '#3B82F6' }, // Blue-500
-      { name: 'Утверждено (нет ТРА)', value: summary.approved, color: '#F59E0B' }, // Amber-500
-      { name: 'Внесено в ТРА (Готово)', value: summary.traUpdated, color: '#10B981' }, // Emerald-500
-    ].filter(item => item.value > 0);
+      { name: 'Выполнено (согласование)', value: summary.shot, color: '#3B82F6' }, // Blue-500
+      { name: 'Утверждено', value: summary.approved, color: '#F59E0B' }, // Amber-500
+      { name: 'Внесено в ТРА', value: summary.traUpdated, color: '#10B981' }, // Emerald-500
+    ];
+    return statuses.filter(item => item.value > 0);
   }, [summary]);
 
   // 5. Определение критически важных объектов (просроченных или предстоящих срочно)
   const criticalProfiles = React.useMemo(() => {
-    return profiles
+    return filteredProfiles
       .filter(p => p.status === 'planned')
       .map(p => {
-        const isOverdue = p.plannedDate < currentDate;
-        const pDate = new Date(p.plannedDate);
+        const isOverdue = p.plannedDate && p.plannedDate < currentDate;
+        const pDate = new Date(p.plannedDate || currentDate);
         const cDate = new Date(currentDate);
         const diffTime = pDate.getTime() - cDate.getTime();
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
@@ -156,40 +193,138 @@ export const Dashboard: React.FC<DashboardProps> = ({ profiles, onSelectProfile,
         };
       })
       .filter(p => p.isOverdue || (p.daysLeft >= 0 && p.daysLeft <= 15))
-      .sort((a, b) => a.plannedDate.localeCompare(b.plannedDate));
-  }, [profiles]);
+      .sort((a, b) => (a.plannedDate || '').localeCompare(b.plannedDate || ''));
+  }, [filteredProfiles]);
 
   // Процент общего выполнения программы
   const completionPercentage = React.useMemo(() => {
-    if (profiles.length === 0) return 0;
-    // Считаем выполненными те, у которых изменения внесены в ТРА
-    return Math.round((summary.traUpdated / profiles.length) * 100);
-  }, [profiles, summary]);
+    if (filteredProfiles.length === 0) return 0;
+    return Math.round((summary.traUpdated / filteredProfiles.length) * 100);
+  }, [filteredProfiles, summary]);
 
   // Процент съемки (хотя бы отснято)
   const shotPercentage = React.useMemo(() => {
-    if (profiles.length === 0) return 0;
+    if (filteredProfiles.length === 0) return 0;
     const totalShotOrBetter = summary.shot + summary.approved + summary.traUpdated;
-    return Math.round((totalShotOrBetter / profiles.length) * 100);
-  }, [profiles, summary]);
+    return Math.round((totalShotOrBetter / filteredProfiles.length) * 100);
+  }, [filteredProfiles, summary]);
+
+  // Профили с активным запретом тормозных башмаков (истек срок съемки и статус не завершен)
+  const tbForbiddenProfiles = React.useMemo(() => {
+    return profiles.filter(p => getTbProhibitionStatus(p, currentDate).isActive);
+  }, [profiles]);
+
+  // Профили с устраненным нарушением (ранее был запрет, но теперь новый профиль утвержден/внесен в ТРА)
+  const resolvedTbProfiles = React.useMemo(() => {
+    return profiles.filter(p => getTbProhibitionStatus(p, currentDate).isResolved);
+  }, [profiles]);
 
   return (
     <div className="space-y-6">
+      {/* Категории контроля - Переключатель */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-slate-100 p-1.5 rounded-2xl gap-2 w-full max-w-2xl border border-slate-200">
+        <button
+          onClick={() => setCategoryFilter('all')}
+          className={`w-full sm:w-auto text-center font-semibold text-xs md:text-sm px-4 py-2.5 rounded-xl transition-all cursor-pointer ${
+            categoryFilter === 'all' 
+              ? 'bg-white text-slate-800 shadow-sm' 
+              : 'text-slate-600 hover:text-slate-800'
+          }`}
+        >
+          Все работы
+        </button>
+        <button
+          onClick={() => setCategoryFilter('survey')}
+          className={`w-full sm:w-auto text-center font-semibold text-xs md:text-sm px-4 py-2.5 rounded-xl transition-all cursor-pointer ${
+            categoryFilter === 'survey' 
+              ? 'bg-blue-600 text-white shadow-sm' 
+              : 'text-slate-600 hover:text-slate-800'
+          }`}
+        >
+          1. Съемка профиля
+        </button>
+        <button
+          onClick={() => setCategoryFilter('alignment')}
+          className={`w-full sm:w-auto text-center font-semibold text-xs md:text-sm px-4 py-2.5 rounded-xl transition-all cursor-pointer ${
+            categoryFilter === 'alignment' 
+              ? 'bg-emerald-600 text-white shadow-sm' 
+              : 'text-slate-600 hover:text-slate-800'
+          }`}
+        >
+          2. Выправка профиля
+        </button>
+      </div>
+
+      {/* Предупреждение о запрете тормозных башмаков */}
+      {tbForbiddenProfiles.length > 0 && (
+        <div className="bg-rose-50 border border-rose-200 p-4 rounded-2xl flex flex-col sm:flex-row items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-rose-100 text-rose-700 rounded-xl animate-pulse">
+              <ShieldAlert className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h4 className="font-extrabold text-rose-900 text-sm md:text-base">КРИТИЧЕСКОЕ ПРЕДУПРЕЖДЕНИЕ БЕЗОПАСНОСТИ: ЗАПРЕТ ЗАКРЕПЛЕНИЯ ТБ!</h4>
+              <p className="text-xs md:text-sm text-rose-700 leading-relaxed">
+                Найдено <span className="font-bold font-mono">{tbForbiddenProfiles.length}</span> путей, где срок действия предыдущей съемки (предыдущего профиля) превысил 10 лет (для сортировочных путей — более 3 лет). 
+                Закрепление вагонов тормозными башмаками на данных путях <strong>КАТЕГОРИЧЕСКИ ЗАПРЕЩЕНО</strong>!
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={() => onNavigateToTab('program', { tbForbiddenFilter: true })} 
+            className="w-full sm:w-auto shrink-0 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1 cursor-pointer"
+          >
+            <span>Показать пути ({tbForbiddenProfiles.length})</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Уведомление об устраненных нарушениях */}
+      {resolvedTbProfiles.length > 0 && (
+        <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl flex flex-col sm:flex-row items-start justify-between gap-4 animate-in fade-in duration-300">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-emerald-100 text-emerald-700 rounded-xl">
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+            <div className="space-y-1">
+              <h4 className="font-extrabold text-emerald-900 text-sm md:text-base">НАРУШЕНИЯ УСПЕШНО УСТРАНЕНЫ: ЗАПРЕТ ТБ СНЯТ</h4>
+              <p className="text-xs md:text-sm text-emerald-700 leading-relaxed">
+                На <span className="font-bold font-mono">{resolvedTbProfiles.length}</span> путях ранее было превышение нормативного срока продольного профиля (было нарушение), но к настоящему моменту новые профили успешно утверждены и внесены изменения в ТРА. <strong>Запрет на закрепление вагонов ТБ успешно снят, безопасность полностью обеспечена!</strong>
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={() => onNavigateToTab('program', { tbResolvedFilter: true })} 
+            className="w-full sm:w-auto shrink-0 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition-all shadow-sm flex items-center justify-center gap-1 cursor-pointer"
+          >
+            <span>Показать пути ({resolvedTbProfiles.length})</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Приветствие и Общие Индикаторы */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between bg-white p-5 rounded-2xl border border-slate-100 shadow-sm gap-4">
         <div>
-          <h2 className="text-xl font-bold text-slate-800 tracking-tight">Контроль съемки продольных профилей</h2>
+          <h2 className="text-xl font-bold text-slate-800 tracking-tight">
+            {categoryFilter === 'all' && "Комплексный контроль продольных профилей"}
+            {categoryFilter === 'survey' && "Программа съемок продольного профиля"}
+            {categoryFilter === 'alignment' && "Программа выправки продольного профиля"}
+          </h2>
           <p className="text-sm text-slate-500 mt-1">
             Текущая дата контроля: <span className="font-semibold text-slate-700">03 июля 2026 г.</span> (разгар летне-путевых работ)
           </p>
         </div>
         <div className="flex items-center gap-4">
           <div className="text-right">
-            <span className="text-xs text-slate-400 block uppercase font-semibold">Съемка путей</span>
+            <span className="text-xs text-slate-400 block uppercase font-semibold">
+              {categoryFilter === 'alignment' ? 'Выправлено путей' : 'Съемка путей'}
+            </span>
             <span className="text-lg font-bold text-slate-800">{shotPercentage}% выполнено</span>
           </div>
           <div className="w-24 bg-slate-100 rounded-full h-2.5">
-            <div className="bg-blue-600 h-2.5 rounded-full" style={{ width: `${shotPercentage}%` }}></div>
+            <div className={`h-2.5 rounded-full ${categoryFilter === 'alignment' ? 'bg-emerald-500' : 'bg-blue-600'}`} style={{ width: `${shotPercentage}%` }}></div>
           </div>
           <div className="border-l border-slate-100 pl-4 text-right">
             <span className="text-xs text-slate-400 block uppercase font-semibold">Полный цикл (ТРА)</span>
@@ -201,14 +336,52 @@ export const Dashboard: React.FC<DashboardProps> = ({ profiles, onSelectProfile,
         </div>
       </div>
 
+      {/* Дополнительные Километровые Метрики при выборе конкретной программы */}
+      {categoryFilter !== 'all' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-200/60">
+          <div className="flex items-center gap-4 bg-white p-4 rounded-xl shadow-xs border border-slate-100">
+            <div className={`p-3 rounded-xl ${categoryFilter === 'alignment' ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
+              <Gauge className="w-6 h-6" />
+            </div>
+            <div className="flex-1 space-y-1">
+              <span className="text-xs text-slate-400 uppercase font-semibold block">Плановый объем работ</span>
+              <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-black text-slate-800">
+                  {categoryFilter === 'alignment' ? alignmentKmStats.plannedKm : surveyKmStats.plannedKm}
+                </span>
+                <span className="text-sm font-bold text-slate-500">км путей</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 bg-white p-4 rounded-xl shadow-xs border border-slate-100">
+            <div className={`p-3 rounded-xl ${categoryFilter === 'alignment' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}`}>
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+            <div className="flex-1 space-y-1">
+              <span className="text-xs text-slate-400 uppercase font-semibold block">Фактический объем выполнения</span>
+              <div className="flex items-baseline gap-2">
+                <span className={`text-2xl font-black ${categoryFilter === 'alignment' ? 'text-emerald-700' : 'text-blue-700'}`}>
+                  {categoryFilter === 'alignment' ? alignmentKmStats.completedKm : surveyKmStats.completedKm}
+                </span>
+                <span className="text-sm font-bold text-slate-500">км ({categoryFilter === 'alignment' ? alignmentKmStats.percent : surveyKmStats.percent}%)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Ключевые показатели (KPI Cards) */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {/* Общий план */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-start justify-between">
+        <div 
+          onClick={() => onNavigateToTab('program', { statusFilter: 'all', overdueFilter: false, tbForbiddenFilter: false, upcomingFilter: false, tbResolvedFilter: false })}
+          className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-start justify-between cursor-pointer transition-transform hover:scale-[1.01] hover:bg-slate-50/50"
+        >
           <div className="space-y-2">
-            <span className="text-sm text-slate-500 font-medium">Всего путей</span>
+            <span className="text-sm text-slate-500 font-medium">Всего в плане</span>
             <div className="text-3xl font-extrabold text-slate-800">{summary.total}</div>
-            <span className="text-xs text-slate-400 block">в годовой программе</span>
+            <span className="text-xs text-slate-400 block">путей в программе</span>
           </div>
           <div className="p-3 bg-slate-50 rounded-xl">
             <Calendar className="w-6 h-6 text-slate-500" />
@@ -216,14 +389,17 @@ export const Dashboard: React.FC<DashboardProps> = ({ profiles, onSelectProfile,
         </div>
 
         {/* Просрочено */}
-        <div className={`p-5 rounded-2xl border shadow-sm flex items-start justify-between cursor-pointer transition-transform hover:scale-[1.01] ${summary.overdue > 0 ? 'bg-red-50/50 border-red-100' : 'bg-white border-slate-100'}`} onClick={() => onNavigateToTab('program')}>
+        <div 
+          onClick={() => onNavigateToTab('program', { overdueFilter: true, statusFilter: 'all' })}
+          className={`p-5 rounded-2xl border shadow-sm flex items-start justify-between cursor-pointer transition-transform hover:scale-[1.01] ${summary.overdue > 0 ? 'bg-red-50/50 border-red-100 hover:bg-red-50' : 'bg-white border-slate-100 hover:bg-slate-50'}`}
+        >
           <div className="space-y-2">
             <span className="text-sm text-red-600 font-semibold flex items-center gap-1">
               Просрочено
               {summary.overdue > 0 && <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>}
             </span>
             <div className="text-3xl font-extrabold text-red-600">{summary.overdue}</div>
-            <span className="text-xs text-red-400 block">требуется срочная съемка</span>
+            <span className="text-xs text-red-400 block">требуются работы</span>
           </div>
           <div className="p-3 bg-red-100/50 rounded-xl">
             <AlertTriangle className="w-6 h-6 text-red-600" />
@@ -231,38 +407,67 @@ export const Dashboard: React.FC<DashboardProps> = ({ profiles, onSelectProfile,
         </div>
 
         {/* Ближайшие */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-start justify-between">
+        <div 
+          onClick={() => onNavigateToTab('program', { upcomingFilter: true, statusFilter: 'planned' })}
+          className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-start justify-between cursor-pointer transition-transform hover:scale-[1.01] hover:bg-slate-50"
+        >
           <div className="space-y-2">
             <span className="text-sm text-amber-600 font-medium">Предстоит (15дн)</span>
             <div className="text-3xl font-extrabold text-amber-600">{summary.upcoming}</div>
-            <span className="text-xs text-slate-400 block">в ближайших планах</span>
+            <span className="text-xs text-slate-400 block">в графике работ</span>
           </div>
           <div className="p-3 bg-amber-50 rounded-xl">
             <Clock className="w-6 h-6 text-amber-500" />
           </div>
         </div>
 
-        {/* Согласование */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-start justify-between">
+        {/* Выполнено (согласование) */}
+        <div 
+          onClick={() => onNavigateToTab('program', { statusFilter: 'shot' })}
+          className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-start justify-between cursor-pointer transition-transform hover:scale-[1.01] hover:bg-blue-50/20"
+        >
           <div className="space-y-2">
-            <span className="text-sm text-blue-600 font-medium">На согласовании</span>
+            <span className="text-sm text-blue-600 font-medium">
+              {categoryFilter === 'alignment' ? 'Выправлено' : 'Снято профилей'}
+            </span>
             <div className="text-3xl font-extrabold text-blue-600">{summary.shot}</div>
-            <span className="text-xs text-slate-400 block">съемка выполнена</span>
+            <span className="text-xs text-slate-400 block">на этапе проверки</span>
           </div>
           <div className="p-3 bg-blue-50 rounded-xl">
             <Gauge className="w-6 h-6 text-blue-500" />
           </div>
         </div>
 
-        {/* Ожидают ТРА */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-start justify-between cursor-pointer transition-transform hover:scale-[1.01]" onClick={() => onNavigateToTab('tra')}>
+        {/* Ожидают ТРА / Утверждено */}
+        <div 
+          onClick={() => onNavigateToTab('program', { statusFilter: 'approved' })}
+          className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-start justify-between cursor-pointer transition-transform hover:scale-[1.01] hover:bg-indigo-50/20"
+        >
           <div className="space-y-2">
-            <span className="text-sm text-indigo-600 font-medium">Утверждено (нет ТРА)</span>
+            <span className="text-sm text-indigo-600 font-medium">Утверждено</span>
             <div className="text-3xl font-extrabold text-indigo-600">{summary.approved}</div>
-            <span className="text-xs text-slate-400 block">ожидает внесения ТРА</span>
+            <span className="text-xs text-slate-400 block">ожидает внесения в ТРА</span>
           </div>
           <div className="p-3 bg-indigo-50 rounded-xl">
             <FileText className="w-6 h-6 text-indigo-500" />
+          </div>
+        </div>
+
+        {/* Запрет ТБ */}
+        <div 
+          onClick={() => onNavigateToTab('program', { tbForbiddenFilter: true })}
+          className={`p-5 rounded-2xl border shadow-sm flex items-start justify-between cursor-pointer transition-transform hover:scale-[1.01] ${tbForbiddenProfiles.length > 0 ? 'bg-rose-50/50 border-rose-100 hover:bg-rose-50' : 'bg-white border-slate-100 hover:bg-slate-50'}`}
+        >
+          <div className="space-y-2">
+            <span className="text-sm text-rose-600 font-extrabold flex items-center gap-1">
+              Запрет ТБ
+              {tbForbiddenProfiles.length > 0 && <span className="inline-block w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>}
+            </span>
+            <div className="text-3xl font-black text-rose-600">{tbForbiddenProfiles.length}</div>
+            <span className="text-xs text-rose-400 block">путей под запретом</span>
+          </div>
+          <div className="p-3 bg-rose-100/50 rounded-xl">
+            <ShieldAlert className="w-6 h-6 text-rose-600" />
           </div>
         </div>
       </div>
@@ -270,12 +475,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ profiles, onSelectProfile,
       {/* Основная часть: Графики и Критические предупреждения */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* График прогресса съемки по месяцам (2/3 ширины) */}
+        {/* График прогресса по месяцам (2/3 ширины) */}
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm lg:col-span-2 space-y-4">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-slate-800 flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-blue-500" />
-              Выполнение плана съемки по месяцам (2026 г.)
+              Выполнение программы по месяцам (2026 г.)
             </h3>
             <span className="text-xs text-slate-400 font-mono">План vs Факт</span>
           </div>
@@ -293,8 +498,8 @@ export const Dashboard: React.FC<DashboardProps> = ({ profiles, onSelectProfile,
                   labelClassName="text-slate-400 font-bold"
                 />
                 <Legend verticalAlign="top" height={36} iconType="circle" />
-                <Bar name="Запланировано съемок" dataKey="planned" fill="#CBD5E1" radius={[4, 4, 0, 0]} barSize={16} />
-                <Bar name="Фактически отснято" dataKey="actual" fill="#3B82F6" radius={[4, 4, 0, 0]} barSize={16} />
+                <Bar name="Запланировано работ" dataKey="planned" fill="#CBD5E1" radius={[4, 4, 0, 0]} barSize={16} />
+                <Bar name="Фактически выполнено" dataKey="actual" fill={categoryFilter === 'alignment' ? '#10B981' : '#3B82F6'} radius={[4, 4, 0, 0]} barSize={16} />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -399,7 +604,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ profiles, onSelectProfile,
 
                   <div className="flex items-center gap-4 justify-between md:justify-end border-t md:border-t-0 pt-2 md:pt-0">
                     <div className="text-left md:text-right">
-                      <span className="text-xs text-slate-400 block">План: {p.plannedDate}</span>
+                      <span className="text-xs text-slate-400 block">План: {formatDate(p.plannedDate)}</span>
                       <span className={`text-xs font-bold ${p.isOverdue ? 'text-red-600' : 'text-amber-600'}`}>
                         {p.isOverdue 
                           ? `Просрочено на ${Math.abs(p.daysLeft)} дн.` 

@@ -16,15 +16,26 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onSave, onClo
   const [station, setStation] = React.useState('');
   const [trackNumber, setTrackNumber] = React.useState('');
   const [trackType, setTrackType] = React.useState<'main' | 'station' | 'special'>('main');
+  const [trackSpecialization, setTrackSpecialization] = React.useState('');
   const [plannedDate, setPlannedDate] = React.useState(currentDate);
   const [enterprise, setEnterprise] = React.useState('');
   const [status, setStatus] = React.useState<ProfileStatus>('planned');
+  const [category, setCategory] = React.useState<'survey' | 'alignment'>('survey');
   
   // Даты вех
   const [actualShotDate, setActualShotDate] = React.useState('');
+  const [actualAlignmentDate, setActualAlignmentDate] = React.useState('');
   const [approvalDate, setApprovalDate] = React.useState('');
   const [traUpdateDate, setTraUpdateDate] = React.useState('');
   
+  // Дополнительные поля для обеих категорий
+  const [workVolume, setWorkVolume] = React.useState<string>('');
+  const [completedVolume, setCompletedVolume] = React.useState<string>('');
+  const [alignmentGoal, setAlignmentGoal] = React.useState('');
+  const [slopeBeforeAfter, setSlopeBeforeAfter] = React.useState('');
+  const [tbBeforeAfter, setTbBeforeAfter] = React.useState('');
+  const [prevSurveyDate, setPrevSurveyDate] = React.useState('');
+
   const [traDocNumber, setTraDocNumber] = React.useState('');
   const [executorName, setExecutorName] = React.useState('');
   const [notes, setNotes] = React.useState('');
@@ -35,11 +46,21 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onSave, onClo
       setStation(profile.station || '');
       setTrackNumber(profile.trackNumber || '');
       setTrackType(profile.trackType || 'main');
+      setTrackSpecialization(profile.trackSpecialization || '');
       setPlannedDate(profile.plannedDate || currentDate);
       setEnterprise(profile.enterprise || '');
       setStatus(profile.status || 'planned');
+      setCategory(profile.category || 'survey');
       setActualShotDate(profile.actualShotDate || '');
+      setActualAlignmentDate(profile.actualAlignmentDate || '');
+      setWorkVolume(profile.workVolume !== undefined ? String(profile.workVolume) : '');
+      setCompletedVolume(profile.completedVolume !== undefined ? String(profile.completedVolume) : '');
+      setAlignmentGoal(profile.alignmentGoal || '');
+      setSlopeBeforeAfter(profile.slopeBeforeAfter || '');
+      setTbBeforeAfter(profile.tbBeforeAfter || '');
+      setPrevSurveyDate(profile.prevSurveyDate || '');
       setApprovalDate(profile.approvalDate || '');
+      // If traUpdateDate is not explicitly present, use profileCheckDsDate or actual date
       setTraUpdateDate(profile.traUpdateDate || '');
       setTraDocNumber(profile.traDocNumber || '');
       setExecutorName(profile.executorName || '');
@@ -49,10 +70,19 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onSave, onClo
       setStation('');
       setTrackNumber('');
       setTrackType('main');
+      setTrackSpecialization('');
       setPlannedDate(currentDate);
       setEnterprise('ПЧ-10 Слюдянская дистанция пути');
       setStatus('planned');
+      setCategory('survey');
       setActualShotDate('');
+      setActualAlignmentDate('');
+      setWorkVolume('');
+      setCompletedVolume('');
+      setAlignmentGoal('');
+      setSlopeBeforeAfter('');
+      setTbBeforeAfter('');
+      setPrevSurveyDate('');
       setApprovalDate('');
       setTraUpdateDate('');
       setTraDocNumber('');
@@ -66,17 +96,29 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onSave, onClo
     setStatus(newStatus);
     
     // Если переводим в статус съемки - подставим дату съемки по умолчанию
-    if (newStatus === 'shot' && !actualShotDate) {
-      setActualShotDate(currentDate);
+    if (newStatus === 'shot') {
+      if (category === 'alignment' && !actualAlignmentDate) {
+        setActualAlignmentDate(currentDate);
+      } else if (category === 'survey' && !actualShotDate) {
+        setActualShotDate(currentDate);
+      }
     }
     // Если в статус утвержден - подставим дату утверждения по умолчанию
     if (newStatus === 'approved') {
-      if (!actualShotDate) setActualShotDate(currentDate);
+      if (category === 'alignment') {
+        if (!actualAlignmentDate) setActualAlignmentDate(currentDate);
+      } else {
+        if (!actualShotDate) setActualShotDate(currentDate);
+      }
       if (!approvalDate) setApprovalDate(currentDate);
     }
     // Если в статус изменений ТРА - подставим все даты
     if (newStatus === 'tra_updated') {
-      if (!actualShotDate) setActualShotDate(currentDate);
+      if (category === 'alignment') {
+        if (!actualAlignmentDate) setActualAlignmentDate(currentDate);
+      } else {
+        if (!actualShotDate) setActualShotDate(currentDate);
+      }
       if (!approvalDate) setApprovalDate(currentDate);
       if (!traUpdateDate) setTraUpdateDate(currentDate);
     }
@@ -84,6 +126,7 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onSave, onClo
     // Очистка дат, если статус откатывается назад
     if (newStatus === 'planned') {
       setActualShotDate('');
+      setActualAlignmentDate('');
       setApprovalDate('');
       setTraUpdateDate('');
       setTraDocNumber('');
@@ -110,14 +153,24 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onSave, onClo
 
     const savedProfile: TrackProfile = {
       id: profile ? profile.id : `prof-${Date.now()}`,
+      category,
       station: station.trim(),
       trackNumber: trackNumber.trim(),
       trackType,
+      trackSpecialization: trackSpecialization.trim() || undefined,
       plannedDate,
       enterprise,
       status,
+      workVolume: workVolume ? parseFloat(workVolume) : undefined,
+      completedVolume: completedVolume ? parseFloat(completedVolume) : undefined,
+      alignmentGoal: category === 'alignment' && alignmentGoal.trim() ? alignmentGoal.trim() : undefined,
+      slopeBeforeAfter: category === 'alignment' && slopeBeforeAfter.trim() ? slopeBeforeAfter.trim() : undefined,
+      tbBeforeAfter: category === 'alignment' && tbBeforeAfter.trim() ? tbBeforeAfter.trim() : undefined,
+      prevSurveyDate: category === 'survey' && prevSurveyDate ? prevSurveyDate : undefined,
+      
       // Включаем только заполненные даты
-      actualShotDate: status !== 'planned' && actualShotDate ? actualShotDate : undefined,
+      actualShotDate: status !== 'planned' && category === 'survey' && actualShotDate ? actualShotDate : undefined,
+      actualAlignmentDate: status !== 'planned' && category === 'alignment' && actualAlignmentDate ? actualAlignmentDate : undefined,
       approvalDate: (status === 'approved' || status === 'tra_updated') && approvalDate ? approvalDate : undefined,
       traUpdateDate: status === 'tra_updated' && traUpdateDate ? traUpdateDate : undefined,
       traDocNumber: status === 'tra_updated' && traDocNumber.trim() ? traDocNumber.trim() : undefined,
@@ -141,7 +194,8 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onSave, onClo
     "ПЧ-15 Черемховская дистанция пути",
     "ПС-26 Проектно-изыскательская партия",
     "ПМС-224 Путевая машинная станция",
-    "ПМС-45 Путевая машинная станция"
+    "ПМС-45 Путевая машинная станция",
+    "ПМС-26 Иркутск"
   ];
 
   return (
@@ -152,7 +206,7 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onSave, onClo
         <div className="flex items-center justify-between p-5 border-b border-slate-100 bg-slate-50">
           <div>
             <h3 className="font-extrabold text-slate-800 text-lg">
-              {isEditing ? 'Редактирование карточки профиля' : 'Добавление пути в программу съемки'}
+              {isEditing ? 'Редактирование карточки профиля' : 'Добавление пути в программу контроля'}
             </h3>
             <p className="text-xs text-slate-500 mt-0.5">
               Заполните сведения о станции, планируемых сроках и фактических этапах
@@ -170,6 +224,35 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onSave, onClo
         {/* Форма */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           
+          {/* Переключатель категории (Съемка или Выправка) */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Категория контроля</label>
+            <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl">
+              <button
+                type="button"
+                onClick={() => setCategory('survey')}
+                className={`py-2 px-4 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  category === 'survey' 
+                    ? 'bg-white text-blue-700 shadow-xs' 
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                1. Съемка продольного профиля
+              </button>
+              <button
+                type="button"
+                onClick={() => setCategory('alignment')}
+                className={`py-2 px-4 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  category === 'alignment' 
+                    ? 'bg-white text-amber-700 shadow-xs' 
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                2. Выправка железнодорожного пути
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             
             {/* Станция */}
@@ -200,9 +283,38 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onSave, onClo
               </label>
               <input 
                 type="text" 
-                placeholder="Например: Главный № I, Сортировочный № 5"
+                placeholder="Например: Главный № II, Путь № 5"
                 value={trackNumber}
-                onChange={(e) => setTrackNumber(e.target.value)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setTrackNumber(val);
+                  const low = val.toLowerCase();
+                  if (low.includes('главн') || low.includes('main') || ['i', 'ii', 'iii', 'iv', '1', '2', '3', '4'].includes(low.trim())) {
+                    setTrackType('main');
+                    if (!trackSpecialization) setTrackSpecialization('Главный');
+                  } else if (low.includes('сортир') && low.includes('отправ')) {
+                    setTrackType('special');
+                    if (!trackSpecialization) setTrackSpecialization('Сортировочно-отправочный');
+                  } else if (low.includes('выставоч')) {
+                    setTrackType('special');
+                    if (!trackSpecialization) setTrackSpecialization('Выставочный');
+                  } else if (low.includes('соединит')) {
+                    setTrackType('special');
+                    if (!trackSpecialization) setTrackSpecialization('Соединительный');
+                  } else if (low.includes('весов')) {
+                    setTrackType('special');
+                    if (!trackSpecialization) setTrackSpecialization('Весовой');
+                  } else if (low.includes('ходов')) {
+                    setTrackType('special');
+                    if (!trackSpecialization) setTrackSpecialization('Ходовой');
+                  } else if (low.includes('сортир')) {
+                    setTrackType('special');
+                    if (!trackSpecialization) setTrackSpecialization('Сортировочный');
+                  } else if (low.includes('прием') || low.includes('отправ') || low.includes('станц') || low.includes('station')) {
+                    setTrackType('station');
+                    if (!trackSpecialization) setTrackSpecialization('Приемо-отправочный');
+                  }
+                }}
                 required
                 className="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none font-semibold text-slate-800"
               />
@@ -216,24 +328,58 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onSave, onClo
                   <button
                     key={t}
                     type="button"
-                    onClick={() => setTrackType(t)}
+                    onClick={() => {
+                      setTrackType(t);
+                      if (t === 'main') setTrackSpecialization('Главный');
+                      else if (t === 'station') setTrackSpecialization('Приемо-отправочный');
+                      else if (t === 'special' && !['Сортировочно-отправочный', 'Выставочный', 'Соединительный', 'Весовой', 'Ходовой'].includes(trackSpecialization)) {
+                        setTrackSpecialization('Прочий');
+                      }
+                    }}
                     className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
                       trackType === t 
                         ? 'bg-blue-50 text-blue-600 border-blue-500 shadow-xs' 
                         : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                     }`}
                   >
-                    {t === 'main' ? 'Главный' : t === 'station' ? 'Станционный' : 'Прочий'}
+                    {t === 'main' ? 'Главный' : t === 'station' ? 'Приемо-отправочный' : 'Прочий'}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Планируемая дата съемки */}
+            {/* Специализация пути */}
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
+                <FileText className="w-3.5 h-3.5 text-blue-500" />
+                Специализация пути (точно как в ТРА/Excel)
+              </label>
+              <input 
+                type="text" 
+                placeholder="Например: Сортировочно-отправочный, Выставочный, Приемо-отправочный"
+                value={trackSpecialization}
+                onChange={(e) => setTrackSpecialization(e.target.value)}
+                className="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:outline-none font-semibold text-slate-800"
+                list="specializations-list"
+              />
+              <datalist id="specializations-list">
+                <option value="Главный" />
+                <option value="Приемо-отправочный" />
+                <option value="Сортировочно-отправочный" />
+                <option value="Выставочный" />
+                <option value="Соединительный" />
+                <option value="Весовой" />
+                <option value="Ходовой" />
+                <option value="Сортировочный" />
+                <option value="Прочий" />
+              </datalist>
+            </div>
+
+            {/* Планируемая дата */}
             <div className="space-y-1">
               <label className="text-xs font-bold text-slate-500 flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5 text-blue-500" />
-                Планируемая дата съемки <span className="text-red-500">*</span>
+                {category === 'alignment' ? 'Планируемая дата выправки' : 'Планируемая дата съемки'} <span className="text-red-500">*</span>
               </label>
               <input 
                 type="date" 
@@ -246,7 +392,9 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onSave, onClo
 
             {/* Предприятие исполнитель */}
             <div className="space-y-1 md:col-span-2">
-              <label className="text-xs font-bold text-slate-500">Предприятие, осуществляющее съемку</label>
+              <label className="text-xs font-bold text-slate-500">
+                {category === 'alignment' ? 'Предприятие, выполняющее выправку (ПЧ/ПМС)' : 'Предприятие, осуществляющее съемку'}
+              </label>
               <input 
                 type="text" 
                 list="enterprises-list"
@@ -262,9 +410,92 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onSave, onClo
 
           </div>
 
+          {/* Категория-специфичные поля (Съемка или Выправка) */}
+          <div className="border-t border-slate-100 pt-5 space-y-4">
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              {category === 'alignment' ? 'Параметры выправки пути' : 'Параметры съемки профиля'}
+            </h4>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Общие для обеих категорий поля объема */}
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-slate-500">Объем работ по плану (км)</label>
+                <input 
+                  type="number" 
+                  step="0.01"
+                  placeholder="Например: 1.25"
+                  value={workVolume}
+                  onChange={(e) => setWorkVolume(e.target.value)}
+                  className="w-full border border-slate-200 rounded-xl p-2.5 text-sm font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none text-slate-800"
+                />
+              </div>
+
+              {category === 'alignment' ? (
+                <>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500">Выполненный объем работ (км)</label>
+                    <input 
+                      type="number" 
+                      step="0.01"
+                      placeholder="Например: 1.10"
+                      value={completedVolume}
+                      onChange={(e) => setCompletedVolume(e.target.value)}
+                      className="w-full border border-slate-200 rounded-xl p-2.5 text-sm font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none text-slate-800"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500">Цель выправки</label>
+                    <input 
+                      type="text" 
+                      placeholder="Например: Устранение просадок"
+                      value={alignmentGoal}
+                      onChange={(e) => setAlignmentGoal(e.target.value)}
+                      className="w-full border border-slate-200 rounded-xl p-2.5 text-sm font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none text-slate-800"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500">Приведенный уклон до/после (‰)</label>
+                    <input 
+                      type="text" 
+                      placeholder="Например: 4.2 / 3.8"
+                      value={slopeBeforeAfter}
+                      onChange={(e) => setSlopeBeforeAfter(e.target.value)}
+                      className="w-full border border-slate-200 rounded-xl p-2.5 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none text-slate-800"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500">Количество т/б до/после выправки</label>
+                    <input 
+                      type="text" 
+                      placeholder="Например: 120 / 80"
+                      value={tbBeforeAfter}
+                      onChange={(e) => setTbBeforeAfter(e.target.value)}
+                      className="w-full border border-slate-200 rounded-xl p-2.5 text-sm font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none text-slate-800"
+                    />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-500">Дата предыдущей съемки</label>
+                    <input 
+                      type="date" 
+                      value={prevSurveyDate}
+                      onChange={(e) => setPrevSurveyDate(e.target.value)}
+                      className="w-full border border-slate-200 rounded-xl p-2.5 text-sm font-semibold focus:ring-2 focus:ring-blue-500 focus:outline-none text-slate-800"
+                    />
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
           {/* Секция жизненного цикла работы и ТРА */}
           <div className="border-t border-slate-100 pt-5 space-y-4">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Жизненный цикл профиля и изменения в ТРА</h4>
+            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Жизненный цикл и изменения в ТРА</h4>
             
             {/* Переключатель статуса */}
             <div className="space-y-1.5">
@@ -292,8 +523,8 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onSave, onClo
                     </span>
                     <span className="text-xs font-extrabold">
                       {st === 'planned' && 'В плане'}
-                      {st === 'shot' && 'Съемка выполнена'}
-                      {st === 'approved' && 'Утвержден'}
+                      {st === 'shot' && (category === 'alignment' ? 'Выправлено' : 'Съемка выполнена')}
+                      {st === 'approved' && 'Утверждено'}
                       {st === 'tra_updated' && 'ТРА обновлен'}
                     </span>
                   </button>
@@ -305,16 +536,28 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onSave, onClo
             {status !== 'planned' && (
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50/50 p-4 rounded-2xl border border-slate-100 animate-in fade-in slide-in-from-top-1 duration-150">
                 
-                {/* Дата съемки */}
+                {/* Дата съемки / выправки */}
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500">Фактическая дата съемки</label>
-                  <input 
-                    type="date" 
-                    value={actualShotDate}
-                    onChange={(e) => setActualShotDate(e.target.value)}
-                    required={status !== 'planned'}
-                    className="w-full bg-white border border-slate-200 rounded-xl p-2 text-xs font-semibold focus:outline-none"
-                  />
+                  <label className="text-xs font-bold text-slate-500">
+                    {category === 'alignment' ? 'Дата выправки (факт)' : 'Дата съемки (факт)'}
+                  </label>
+                  {category === 'alignment' ? (
+                    <input 
+                      type="date" 
+                      value={actualAlignmentDate}
+                      onChange={(e) => setActualAlignmentDate(e.target.value)}
+                      required={true}
+                      className="w-full bg-white border border-slate-200 rounded-xl p-2 text-xs font-semibold focus:outline-none"
+                    />
+                  ) : (
+                    <input 
+                      type="date" 
+                      value={actualShotDate}
+                      onChange={(e) => setActualShotDate(e.target.value)}
+                      required={true}
+                      className="w-full bg-white border border-slate-200 rounded-xl p-2 text-xs font-semibold focus:outline-none"
+                    />
+                  )}
                 </div>
 
                 {/* Дата утверждения */}
@@ -375,7 +618,7 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onSave, onClo
               </label>
               <input 
                 type="text" 
-                placeholder="ФИО инженера / руководителя партии"
+                placeholder="ФИО инженера / дорожного мастера"
                 value={executorName}
                 onChange={(e) => setExecutorName(e.target.value)}
                 className="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium text-slate-800"
@@ -387,7 +630,7 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onSave, onClo
               <label className="text-xs font-bold text-slate-500">Примечания / Замечания по объекту</label>
               <textarea 
                 rows={3}
-                placeholder="Укажите особые условия съемки, причины переноса сроков или реквизиты согласований..."
+                placeholder="Укажите особые условия работы, примененную технику, причины переноса сроков или реквизиты согласований..."
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 className="w-full border border-slate-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none font-medium text-slate-800"

@@ -24,7 +24,7 @@ export const ExcelImporter: React.FC<ExcelImporterProps> = ({
   const [dragActive, setDragActive] = React.useState<boolean>(false);
 
   // Спецификация маппинга колонок Excel (ищет совпадения по русским и английским названиям)
-  const mapRowToProfile = (row: any, index: number): TrackProfile => {
+  const mapRowToProfile = (row: any, index: number, sheetName?: string): TrackProfile => {
     // Вспомогательная функция поиска значения по синонимам заголовков
     const getValue = (keys: string[]): any => {
       for (const k of keys) {
@@ -49,14 +49,22 @@ export const ExcelImporter: React.FC<ExcelImporterProps> = ({
       const str = String(val).trim();
       if (/^\d{4}-\d{2}-\d{2}$/.test(str)) return str;
 
-      const dotMatch = str.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+      const dotMatch = str.match(/^(\d{1,2})\.(\d{1,2})\.(\d{2,4})$/);
       if (dotMatch) {
-        return `${dotMatch[3]}-${dotMatch[2].padStart(2, '0')}-${dotMatch[1].padStart(2, '0')}`;
+        let year = dotMatch[3];
+        if (year.length === 2) {
+          year = parseInt(year) < 50 ? `20${year}` : `19${year}`;
+        }
+        return `${year}-${dotMatch[2].padStart(2, '0')}-${dotMatch[1].padStart(2, '0')}`;
       }
 
-      const slashMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+      const slashMatch = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
       if (slashMatch) {
-        return `${slashMatch[3]}-${slashMatch[2].padStart(2, '0')}-${slashMatch[1].padStart(2, '0')}`;
+        let year = slashMatch[3];
+        if (year.length === 2) {
+          year = parseInt(year) < 50 ? `20${year}` : `19${year}`;
+        }
+        return `${year}-${slashMatch[2].padStart(2, '0')}-${slashMatch[1].padStart(2, '0')}`;
       }
 
       try {
@@ -70,11 +78,15 @@ export const ExcelImporter: React.FC<ExcelImporterProps> = ({
     };
 
     // Нормализация типа пути
-    const getTrackType = (val: any): 'main' | 'station' | 'special' => {
-      if (!val) return 'station';
-      const str = String(val).trim().toLowerCase();
-      if (str.includes('главн') || str.includes('main') || str === 'i' || str === '1') return 'main';
-      if (str.includes('спец') || str.includes('проч') || str.includes('special') || str.includes('сортир')) return 'special';
+    const getTrackType = (val: any, trackNumText?: string): 'main' | 'station' | 'special' => {
+      let str = val ? String(val).trim().toLowerCase() : '';
+      if (!str && trackNumText) {
+        str = String(trackNumText).trim().toLowerCase();
+      }
+      if (!str) return 'station';
+      if (str.includes('главн') || str.includes('main') || str === 'i' || str === '1' || str === 'ii' || str === 'iii' || str === 'iv') return 'main';
+      if (str.includes('проч') || str.includes('спец') || str.includes('special') || str.includes('сортир') || str.includes('выставоч') || str.includes('соединит') || str.includes('весов') || str.includes('ходов')) return 'special';
+      if (str.includes('прием') || str.includes('отправ') || str.includes('станц') || str.includes('station')) return 'station';
       return 'station';
     };
 
@@ -88,33 +100,169 @@ export const ExcelImporter: React.FC<ExcelImporterProps> = ({
       return 'planned';
     };
 
+    const hasAlignmentKeys = Object.keys(row).some(rk => {
+      const low = rk.toLowerCase();
+      return low.includes('выправка') || low.includes('уклон') || low.includes('цель') || low.includes('выполненн');
+    });
+
+    let category: 'survey' | 'alignment' = hasAlignmentKeys ? 'alignment' : 'survey';
+    if (sheetName) {
+      const lowSheet = sheetName.toLowerCase();
+      if (lowSheet.includes('выправка') || lowSheet.includes('alignment')) {
+        category = 'alignment';
+      } else if (lowSheet.includes('съемка') || lowSheet.includes('survey')) {
+        category = 'survey';
+      }
+    }
+
     const station = getValue(['станция', 'станция пути', 'station', 'наименование станции']) || 'Неизвестная станция';
-    const trackNumber = getValue(['номер пути', 'путь', 'tracknumber', 'track', 'путь №']) || 'Путь не указан';
-    const trackType = getTrackType(getValue(['категория пути', 'категория', 'тип пути', 'тип', 'tracktype']));
-    const plannedDate = parseDate(getValue(['плановая дата', 'план', 'планируемая дата', 'дата плана', 'planneddate'])) || new Date().toISOString().slice(0, 10);
-    const enterprise = getValue(['предприятие', 'исполнитель', 'пч', 'организация', 'enterprise']) || 'ПЧ (не указано)';
-    const status = getStatus(getValue(['статус', 'состояние', 'status']));
+    const trackNumber = getValue(['номер пути', 'путь', 'tracknumber', 'track', 'путь №', '№№ путей', '№ путей']) || 'Путь не указан';
+    const trackType = getTrackType(getValue(['категория пути', 'категория', 'тип пути', 'тип', 'tracktype', 'специализация', 'назначение пути', 'специализация пути', 'назначение']), trackNumber);
     
-    const actualShotDate = parseDate(getValue(['фактическая дата', 'дата съемки', 'actualshotdate', 'съемка факт']));
-    const approvalDate = parseDate(getValue(['дата утверждения', 'утвержден', 'approvaldate']));
-    const traUpdateDate = parseDate(getValue(['дата изменений тра', 'дата тра', 'traupdatedate']));
-    const traDocNumber = getValue(['номер распоряжения', 'приказ', 'акт', 'документ', 'tradocnumber']);
+    // Специализация пути (из файла или рассчитанная на основе ТРА)
+    let trackSpecialization = getValue(['специализация пути', 'специализация', 'назначение пути', 'назначение', 'категория пути', 'категория', 'тип пути', 'тип', 'tracktype', 'trackspecialization']) || '';
+    if (!trackSpecialization && trackNumber) {
+      const low = trackNumber.toLowerCase();
+      if (low.includes('главн') || low.includes('main') || ['i', 'ii', 'iii', 'iv', '1', '2', '3', '4'].includes(low.trim())) {
+        trackSpecialization = 'Главный';
+      } else if (low.includes('сортир') && low.includes('отправ')) {
+        trackSpecialization = 'Сортировочно-отправочный';
+      } else if (low.includes('выставоч')) {
+        trackSpecialization = 'Выставочный';
+      } else if (low.includes('соединит')) {
+        trackSpecialization = 'Соединительный';
+      } else if (low.includes('весов')) {
+        trackSpecialization = 'Весовой';
+      } else if (low.includes('ходов')) {
+        trackSpecialization = 'Ходовой';
+      } else if (low.includes('сортир')) {
+        trackSpecialization = 'Сортировочный';
+      } else if (low.includes('прием') || low.includes('отправ') || low.includes('станц') || low.includes('station')) {
+        trackSpecialization = 'Приемо-отправочный';
+      }
+    }
+    if (!trackSpecialization) {
+      trackSpecialization = trackType === 'main' ? 'Главный' : trackType === 'station' ? 'Приемо-отправочный' : 'Прочий';
+    }
+    
+    // Срок исполнения или квартал или плановая дата
+    const rawPlannedDate = getValue(['плановая дата', 'планируемая дата', 'дата плана', 'planneddate']);
+    const rawTerm = getValue(['плановый срок', 'планируемый срок', 'срок выполнения', 'срок исполнения', 'срок', 'квартал', 'quarter']);
+
+    let plannedDate = '';
+    let quarter = '';
+
+    const isValidISODate = (str: string): boolean => {
+      return /^\d{4}-\d{2}-\d{2}$/.test(str);
+    };
+
+    const parseQuarterToDate = (qStr: string): string => {
+      const low = qStr.toLowerCase();
+      let year = '2026';
+      const yearMatch = low.match(/(202\d)/);
+      if (yearMatch) {
+        year = yearMatch[1];
+      }
+
+      if (low.includes('i кв') || low.includes('1 кв') || low.includes('1-й кв') || low.includes('первый кв')) {
+        return `${year}-03-15`;
+      }
+      if (low.includes('ii кв') || low.includes('2 кв') || low.includes('2-й кв') || low.includes('второй кв')) {
+        return `${year}-06-15`;
+      }
+      if (low.includes('iii кв') || low.includes('3 кв') || low.includes('3-й кв') || low.includes('третий кв')) {
+        return `${year}-09-15`;
+      }
+      if (low.includes('iv кв') || low.includes('4 кв') || low.includes('4-й кв') || low.includes('четвертый кв')) {
+        return `${year}-12-15`;
+      }
+      return '';
+    };
+
+    const parsedPlanned = parseDate(rawPlannedDate);
+    const parsedTerm = parseDate(rawTerm);
+
+    if (isValidISODate(parsedPlanned)) {
+      plannedDate = parsedPlanned;
+      if (rawTerm && !isValidISODate(parsedTerm)) {
+        quarter = String(rawTerm).trim();
+      }
+    } else if (isValidISODate(parsedTerm)) {
+      plannedDate = parsedTerm;
+    } else {
+      // Ни один не является валидной датой YYYY-MM-DD
+      const textVal = rawPlannedDate || rawTerm;
+      if (textVal) {
+        const textStr = String(textVal).trim();
+        quarter = textStr;
+        plannedDate = parseQuarterToDate(textStr);
+      }
+    }
+    
+    const enterprise = getValue(['предприятие', 'исполнитель', 'пч', 'организация', 'enterprise']) || 'ПЧ (не указано)';
+    
+    // Новые поля для Выправки и Съемки
+    const pch = getValue(['пч', 'дистанция', 'pch']) || (typeof enterprise === 'string' && enterprise.startsWith('ПЧ') ? enterprise : undefined);
+    const workVolume = parseFloat(getValue(['объем работ', 'объем', 'volume', 'км', 'объем работ, км', 'объем работ (км)'])) || undefined;
+    const completedVolume = parseFloat(getValue(['объем выполненных', 'выполнено км', 'выполненных работ', 'completedvolume', 'объем выполненных работ (км)'])) || undefined;
+    
+    const actualAlignmentDate = parseDate(getValue(['дата выправки', 'дата выправки факт', 'actualalignmentdate']));
+    const actualShotDate = parseDate(getValue(['фактическая дата', 'дата съемки', 'actualshotdate', 'съемка факт', 'дата съемки']));
+    const profileCheckDsDate = parseDate(getValue(['дата проверки профиля дс', 'проверка дс', 'profilecheckdsdate', 'дата проверки профиля']));
+    const approvalDate = parseDate(getValue(['дата утверждения', 'утвержден', 'approvaldate', 'дата утверждения профиля']));
+    const profileProvideStationDate = parseDate(getValue(['дата предоставления', 'предоставление на станцию', 'profileprovidestationdate', 'дата предоставления профиля на станцию']));
+    const traActCreateDate = parseDate(getValue(['дата создания акта', 'создание акта', 'traactcreatedate', 'дата создания акта изменения в тра']));
+    const traActApproveDate = parseDate(getValue(['дата утверждения акта', 'утверждение акта', 'traactapprovedate', 'дата утверждения акта тра', 'дата утверждения акта изменения тра']));
+    const traUpdateDate = parseDate(getValue(['дата изменений тра', 'дата изменений', 'тра изменения', 'traupdatedate', 'дата внесения изменений в тра']));
+
+    // Интеллектуальный расчет статуса на основе введенных дат, если столбец статус отсутствует/пуст/planned
+    let status = getStatus(getValue(['статус', 'состояние', 'status']));
+    if (status === 'planned') {
+      if (traUpdateDate || traActApproveDate || traActCreateDate) {
+        status = 'tra_updated';
+      } else if (approvalDate || profileProvideStationDate || profileCheckDsDate) {
+        status = 'approved';
+      } else if (actualShotDate || actualAlignmentDate) {
+        status = 'shot';
+      }
+    }
+    
+    const alignmentGoal = getValue(['цель работ', 'цель', 'alignmentgoal']);
+    const slopeBeforeAfter = getValue(['приведенный уклон', 'уклон до/после', 'slopebeforeafter', 'приведенный уклон пути до/после выправки']);
+    const tbBeforeAfter = getValue(['количество т/б', 'т/б до/после', 'tbbeforeafter', 'количество т/б до/после выправки']);
+    const prevSurveyDate = parseDate(getValue(['дата предыдущей съемки', 'предыдущая съемка', 'prevsurveydate', 'дата предыдущей съемки']));
+    const traDocNumber = getValue(['номер распоряжения', 'приказ', 'акт', 'документ', 'tradocnumber', 'акт изменения в тра']);
     const executorName = getValue(['ответственный', 'инженер', 'исполнитель фио', 'executorname']);
-    const notes = getValue(['примечания', 'примечание', 'заметки', 'notes', 'комментарий']);
+    const notes = getValue(['примечания', 'примечание', 'заметки', 'notes', 'комментарий', 'примечание (достижение цели работ']);
 
     const generatedId = `excel-${Date.now()}-${index}-${Math.floor(Math.random() * 1000)}`;
 
     return {
       id: generatedId,
+      category,
       station,
       trackNumber,
       trackType,
-      plannedDate,
+      trackSpecialization,
+      plannedDate: plannedDate || '2026-06-30', // fallback
       enterprise,
       status,
+      ...(pch && { pch }),
+      ...(workVolume !== undefined && !isNaN(workVolume) && { workVolume }),
+      ...(completedVolume !== undefined && !isNaN(completedVolume) && { completedVolume }),
+      ...(quarter && { quarter }),
+      ...(actualAlignmentDate && { actualAlignmentDate }),
       ...(actualShotDate && { actualShotDate }),
+      ...(profileCheckDsDate && { profileCheckDsDate }),
       ...(approvalDate && { approvalDate }),
+      ...(profileProvideStationDate && { profileProvideStationDate }),
+      ...(traActCreateDate && { traActCreateDate }),
+      ...(traActApproveDate && { traActApproveDate }),
       ...(traUpdateDate && { traUpdateDate }),
+      ...(alignmentGoal && { alignmentGoal }),
+      ...(slopeBeforeAfter && { slopeBeforeAfter }),
+      ...(tbBeforeAfter && { tbBeforeAfter }),
+      ...(prevSurveyDate && { prevSurveyDate }),
       ...(traDocNumber && { traDocNumber }),
       ...(executorName && { executorName }),
       ...(notes && { notes }),
@@ -139,22 +287,25 @@ export const ExcelImporter: React.FC<ExcelImporterProps> = ({
           return;
         }
 
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
+        let allProfiles: TrackProfile[] = [];
+        let totalRowsParsed = 0;
+
+        workbook.SheetNames.forEach((sheetName) => {
+          const worksheet = workbook.Sheets[sheetName];
+          const rows = XLSX.utils.sheet_to_json(worksheet);
+          totalRowsParsed += rows.length;
+          
+          const sheetProfiles = rows.map((row, idx) => mapRowToProfile(row, idx + totalRowsParsed, sheetName));
+          allProfiles = [...allProfiles, ...sheetProfiles];
+        });
         
-        // Преобразуем в массив объектов
-        const rows = XLSX.utils.sheet_to_json(worksheet);
-        
-        if (rows.length === 0) {
-          setError('Лист Excel не содержит строк данных.');
+        if (allProfiles.length === 0) {
+          setError('Листы Excel не содержат строк данных.');
           return;
         }
 
-        setParsedRows(rows);
-
-        // Маппим каждую строку на TrackProfile
-        const profiles = rows.map((row, idx) => mapRowToProfile(row, idx));
-        setMappedProfiles(profiles);
+        setParsedRows(allProfiles);
+        setMappedProfiles(allProfiles);
       } catch (err) {
         setError('Не удалось прочитать файл. Убедитесь, что это корректный файл Excel (.xlsx, .xls).');
       }
@@ -200,43 +351,77 @@ export const ExcelImporter: React.FC<ExcelImporterProps> = ({
 
   // Скачать эталонный шаблон Excel
   const handleDownloadTemplate = () => {
-    const headers = [
+    const surveyHeaders = [
       "Станция", 
       "Номер пути", 
-      "Категория пути (Главный/Станционный/Специальный)", 
+      "Категория пути (Главный/Приемо-отправочный/Прочий)", 
       "Плановая дата съемки (ГГГГ-ММ-ДД)", 
+      "Объем работ (км)",
       "Предприятие-исполнитель", 
       "Ответственный (ФИО)",
       "Примечания"
     ];
 
-    const sampleRows = [
-      ["Иркутск-Пассажирский", "Главный путь № II", "Главный", "2026-08-10", "ПЧ-13 Иркутск-Пассажирская дистанция", "Сидоров В.А.", "Плановые работы по выправке продольного профиля"],
-      ["Слюдянка-1", "Путь № 5 (приемо-отправочный)", "Станционный", "2026-09-15", "ПЧ-10 Слюдянская дистанция пути", "Иванов П.С.", "После ремонта стрелочного перевода"],
-      ["Ангарск", "Путь № 7 (сортировочный)", "Специальный", "2026-10-01", "ПС-26 Проектно-изыскательская партия", "Петров А.Н.", "Съемка по программе контроля путей"]
+    const surveyRows = [
+      ["Иркутск-Пассажирский", "Главный путь № II", "Главный", "2026-08-10", "1.25", "ПЧ-13 Иркутск-Пассажирская дистанция", "Сидоров В.А.", "Плановая съемка продольного профиля пути"],
+      ["Слюдянка-1", "Путь № 5", "Приемо-отправочный", "2026-09-15", "0.85", "ПЧ-10 Слюдянская дистанция пути", "Иванов П.С.", "После ремонта стрелочного перевода"]
     ];
 
-    const worksheet = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
+    const alignmentHeaders = [
+      "Станция", 
+      "Номер пути", 
+      "Категория пути (Главный/Приемо-отправочный/Прочий)", 
+      "Плановая дата выправки (ГГГГ-ММ-ДД)", 
+      "Объем работ (км)",
+      "Предприятие-исполнитель", 
+      "Ответственный (ФИО)",
+      "Цель работ",
+      "Приведенный уклон до/после",
+      "Количество т/б до/после",
+      "Примечания"
+    ];
+
+    const alignmentRows = [
+      ["Ангарск", "Путь № 7", "Приемо-отправочный", "2026-06-20", "1.10", "ПМС-26 Иркутск", "Петров А.Н.", "Устранение просадок профиля", "4.2 / 3.8", "120 / 80", "Выправка машинным способом ВПО-3000"]
+    ];
+
     const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Шаблон Программы");
 
-    // Зададим ширину колонок для красивого отображения в Excel
-    worksheet['!cols'] = [
+    const surveySheet = XLSX.utils.aoa_to_sheet([surveyHeaders, ...surveyRows]);
+    surveySheet['!cols'] = [
       { wch: 25 }, // Станция
-      { wch: 25 }, // Номер пути
+      { wch: 20 }, // Номер пути
       { wch: 25 }, // Категория пути
-      { wch: 30 }, // Плановая дата
+      { wch: 25 }, // Плановая дата
+      { wch: 18 }, // Объем
       { wch: 35 }, // Исполнитель
-      { wch: 25 }, // Ответственный
-      { wch: 45 }  // Примечания
+      { wch: 22 }, // Ответственный
+      { wch: 35 }  // Примечания
     ];
+    XLSX.utils.book_append_sheet(workbook, surveySheet, "1. Съемка");
+
+    const alignmentSheet = XLSX.utils.aoa_to_sheet([alignmentHeaders, ...alignmentRows]);
+    alignmentSheet['!cols'] = [
+      { wch: 25 }, // Станция
+      { wch: 20 }, // Номер пути
+      { wch: 25 }, // Категория пути
+      { wch: 25 }, // Плановая дата
+      { wch: 18 }, // Объем
+      { wch: 30 }, // Исполнитель
+      { wch: 22 }, // Ответственный
+      { wch: 25 }, // Цель
+      { wch: 22 }, // Уклон
+      { wch: 22 }, // Т/Б
+      { wch: 35 }  // Примечания
+    ];
+    XLSX.utils.book_append_sheet(workbook, alignmentSheet, "2. Выправка");
 
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
     const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     
     const downloadAnchor = document.createElement('a');
     downloadAnchor.setAttribute("href", URL.createObjectURL(blob));
-    downloadAnchor.setAttribute("download", `программа_съемки_шаблон_2026.xlsx`);
+    downloadAnchor.setAttribute("download", `программа_профилей_шаблон.xlsx`);
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
@@ -430,7 +615,7 @@ export const ExcelImporter: React.FC<ExcelImporterProps> = ({
                             <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
                               p.trackType === 'main' ? 'bg-indigo-50 text-indigo-700' : p.trackType === 'station' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'
                             }`}>
-                              {p.trackType === 'main' ? 'Главный' : p.trackType === 'station' ? 'Станционный' : 'Прочий'}
+                              {p.trackSpecialization || (p.trackType === 'main' ? 'Главный' : p.trackType === 'station' ? 'Приемо-отправочный' : 'Прочий')}
                             </span>
                           </td>
                           <td className="py-2 px-3 font-medium text-slate-600">{p.plannedDate}</td>
