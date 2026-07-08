@@ -164,9 +164,29 @@ export const BackupManager: React.FC<BackupManagerProps> = ({
           </div>
 
           <div className="space-y-1">
-            <h4 className="font-bold text-slate-800">3. Поддержка автономности (Huawei Tablet)</h4>
+            <h4 className="font-bold text-slate-800">3. Автономность и Работа Офлайн</h4>
             <p>
-              Вся база данных хранится <strong className="text-slate-800">локально в памяти вашего планшета (localStorage)</strong>. Она не сотрется при перезагрузке страницы или отключении от сети Интернет во время путевого обхода. Используйте панели резервного копирования справа для переноса данных.
+              Приложение полностью спроектировано как <strong>PWA (Progressive Web App)</strong>. Вся база данных сохраняется в локальной памяти планшета (<code className="bg-slate-100 px-1 py-0.5 rounded font-mono text-xs">localStorage</code>). Вы можете полноценно редактировать записи, импортировать файлы Excel и формировать отчеты, находясь на перегоне без интернета.
+            </p>
+          </div>
+
+          <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 space-y-2 mt-4">
+            <h4 className="font-bold text-blue-800 flex items-center gap-1.5 text-sm">
+              <span className="flex items-center justify-center w-5 h-5 bg-blue-600 text-white rounded-full text-xs font-black">↓</span>
+              Инструкция по установке на планшет Huawei / Android
+            </h4>
+            <p className="text-xs text-blue-700 leading-relaxed">
+              Приложение можно установить как обычную программу прямо из браузера (без Google Play Маркета и APK-файлов):
+            </p>
+            <ol className="list-decimal pl-5 text-xs text-blue-800 space-y-1">
+              <li>Откройте ссылку на приложение в <strong>стандартном браузере Huawei</strong> или <strong>Google Chrome</strong> на планшете.</li>
+              <li>Нажмите на <strong>кнопку меню</strong> браузера (три точки в правом верхнем углу) или иконку «Поделиться».</li>
+              <li>Выберите пункт <strong>«Добавить на рабочий стол»</strong> (или <strong>«Установить приложение»</strong>).</li>
+              <li>На рабочем столе планшета появится ярлык <strong>«СК-ПРОФИЛИ»</strong>.</li>
+              <li>При запуске с этого ярлыка приложение будет открываться на весь экран в полноэкранном режиме и работать <strong>полностью автономно</strong> без подключения к сети.</li>
+            </ol>
+            <p className="text-[11px] text-blue-600 italic">
+              *Встроенный Service Worker автоматически кэширует все скрипты, шрифты, таблицы и стили при первом запуске, поэтому приложение мгновенно загрузится на перегоне даже в режиме полета.
             </p>
           </div>
         </div>

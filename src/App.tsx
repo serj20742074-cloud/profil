@@ -196,10 +196,14 @@ export default function App() {
               <ClipboardList className="w-6 h-6" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h1 className="font-extrabold text-lg text-slate-900 tracking-tight">СК-ПРОФИЛИ</h1>
                 <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-black uppercase tracking-wider">
                   Планшетный Контроль
+                </span>
+                <span className="text-[10px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full font-black uppercase tracking-wider flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  100% Офлайн (PWA)
                 </span>
               </div>
               <p className="text-xs text-slate-400">Служба пути • Учет продольных профилей и ТРА станций</p>

@@ -1,0 +1,42 @@
+{
+  "name": "Контроль Продольных Профилей СК-ПРОФИЛИ",
+  "short_name": "СК-ПРОФИЛИ",
+  "description": "Мобильное планшетное приложение для оперативного контроля своевременности съемки продольных профилей путей, ведения годового графика, утверждения вех и внесения изменений в ТРА станций.",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#1e40af",
+  "theme_color": "#1e40af",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}
