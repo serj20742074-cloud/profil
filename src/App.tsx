@@ -12,11 +12,11 @@ import { ProfileForm } from './components/ProfileForm';
 import { TraChangeManager } from './components/TraChangeManager';
 import { BackupManager } from './components/BackupManager';
 import { MarkdownReport } from './components/MarkdownReport';
-import { formatDate, getTbProhibitionStatus } from './utils';
+import { formatDate, getTbProhibitionStatus, getCurrentDateString } from './utils';
 
 export default function App() {
   const LOCAL_STORAGE_KEY = 'track_profiles_program_2026';
-  const currentDate = '2026-07-03';
+  const currentDate = getCurrentDateString();
 
   // 1. Состояние профилей (база данных)
   const [profiles, setProfiles] = React.useState<TrackProfile[]>([]);
@@ -288,6 +288,7 @@ export default function App() {
         {activeTab === 'dashboard' && (
           <Dashboard 
             profiles={profiles} 
+            currentDate={currentDate}
             onSelectProfile={handleSelectProfile} 
             onNavigateToTab={handleNavigateToTab}
           />
@@ -296,6 +297,7 @@ export default function App() {
         {activeTab === 'program' && (
           <ProfileTable 
             profiles={profiles} 
+            currentDate={currentDate}
             onSelectProfile={handleSelectProfile}
             onEditProfile={handleEditProfileClick}
             onDeleteProfile={handleDeleteProfile}
@@ -310,6 +312,7 @@ export default function App() {
         {activeTab === 'tra' && (
           <TraChangeManager 
             profiles={profiles} 
+            currentDate={currentDate}
             onQuickStatusChange={handleQuickStatusChange}
             onSelectProfile={handleSelectProfile}
           />

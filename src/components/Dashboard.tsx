@@ -12,12 +12,12 @@ import { formatDate, getTbProhibitionStatus } from '../utils';
 
 interface DashboardProps {
   profiles: TrackProfile[];
+  currentDate: string;
   onSelectProfile: (profileId: string) => void;
   onNavigateToTab: (tab: string, filters?: any) => void;
 }
 
-export const Dashboard: React.FC<DashboardProps> = ({ profiles, onSelectProfile, onNavigateToTab }) => {
-  const currentDate = '2026-07-03'; // Фиксированная системная дата для расчетов контроля
+export const Dashboard: React.FC<DashboardProps> = ({ profiles, currentDate, onSelectProfile, onNavigateToTab }) => {
   const [categoryFilter, setCategoryFilter] = React.useState<'all' | 'survey' | 'alignment'>('all');
 
   // Фильтруем профили по выбранной категории

@@ -38,6 +38,17 @@ export function formatDate(dateStr: string | undefined | null): string {
   return trimmed;
 }
 
+/**
+ * Возвращает текущую системную дату в формате YYYY-MM-DD
+ */
+export function getCurrentDateString(): string {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export interface TbStatusResult {
   hasViolation: boolean; // Было ли нарушение вообще (активное или устраненное)
   isActive: boolean;     // Активен ли запрет ТБ прямо сейчас
@@ -59,7 +70,7 @@ export function getTbProhibitionStatus(
     traUpdateDate?: string;
     actualShotDate?: string;
   },
-  currentDate: string = '2026-07-03'
+  currentDate: string = getCurrentDateString()
 ): TbStatusResult {
   const result: TbStatusResult = {
     hasViolation: false,

@@ -8,16 +8,17 @@ import { formatDate } from '../utils';
 
 interface TraChangeManagerProps {
   profiles: TrackProfile[];
+  currentDate: string;
   onQuickStatusChange: (profileId: string, nextStatus: ProfileStatus, dates: { [key: string]: string; doc?: string }) => void;
   onSelectProfile: (profileId: string) => void;
 }
 
 export const TraChangeManager: React.FC<TraChangeManagerProps> = ({
   profiles,
+  currentDate,
   onQuickStatusChange,
   onSelectProfile
 }) => {
-  const currentDate = '2026-07-03';
   const [search, setSearch] = React.useState('');
 
   // 1. Фильтруем только те профили, которые либо утверждены, либо изменения в ТРА уже внесены

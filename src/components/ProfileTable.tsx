@@ -10,6 +10,7 @@ import { formatDate, getTbProhibitionStatus } from '../utils';
 
 interface ProfileTableProps {
   profiles: TrackProfile[];
+  currentDate: string;
   onSelectProfile: (profileId: string) => void;
   onEditProfile: (profile: TrackProfile) => void;
   onDeleteProfile: (profileId: string) => void;
@@ -22,6 +23,7 @@ interface ProfileTableProps {
 
 export const ProfileTable: React.FC<ProfileTableProps> = ({
   profiles,
+  currentDate,
   onSelectProfile,
   onEditProfile,
   onDeleteProfile,
@@ -31,7 +33,6 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
   initialFilters,
   clearInitialFilters
 }) => {
-  const currentDate = '2026-07-03';
   const [categoryTab, setCategoryTab] = React.useState<'all' | 'survey' | 'alignment'>('all');
 
   // Состояния фильтрации и поиска

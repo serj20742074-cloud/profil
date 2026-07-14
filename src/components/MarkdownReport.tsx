@@ -4,14 +4,14 @@ import {
   FileText, Clipboard, Download, RefreshCw, Eye, Edit3, Check, AlertTriangle, ShieldAlert, BadgeInfo
 } from 'lucide-react';
 import { TrackProfile, ProfileStatus } from '../types';
-import { formatDate, getTbProhibitionStatus } from '../utils';
+import { formatDate, getTbProhibitionStatus, getCurrentDateString } from '../utils';
 
 interface MarkdownReportProps {
   profiles: TrackProfile[];
   currentDate?: string;
 }
 
-export const MarkdownReport: React.FC<MarkdownReportProps> = ({ profiles, currentDate = '2026-07-03' }) => {
+export const MarkdownReport: React.FC<MarkdownReportProps> = ({ profiles, currentDate = getCurrentDateString() }) => {
   const [activeTab, setActiveTab] = React.useState<'preview' | 'raw'>('preview');
   const [copied, setCopied] = React.useState(false);
   const [reportText, setReportText] = React.useState('');
@@ -84,7 +84,7 @@ export const MarkdownReport: React.FC<MarkdownReportProps> = ({ profiles, curren
 
     // Сборка текста в формате Markdown
     let md = `# Аналитический отчет по контролю продольных профилей путей и ТРА станций\n`;
-    md += `**Дата анализа:** 07.07.2026 (Расчетная дата контроля системы: \`${formatDate(currentDate)}\`)\n\n`;
+    md += `**Дата анализа:** ${formatDate(currentDate)} (Расчетная дата контроля системы: \`${formatDate(currentDate)}\`)\n\n`;
     md += `---\n\n`;
 
     md += `## 📊 1. Сводные показатели программы контроля\n\n`;
