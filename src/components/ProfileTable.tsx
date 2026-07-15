@@ -52,6 +52,7 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
 
   // Состояние импорта Excel
   const [isExcelImportOpen, setIsExcelImportOpen] = React.useState(false);
+  const [importForcedCategory, setImportForcedCategory] = React.useState<'survey' | 'alignment' | undefined>(undefined);
 
   // Состояния быстрой смены статуса (модалка/ввод для дат)
   const [quickActionProfile, setQuickActionProfile] = React.useState<TrackProfile | null>(null);
@@ -284,20 +285,35 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
               className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all text-slate-800"
             />
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button 
-              onClick={() => setIsExcelImportOpen(true)}
-              className="flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-semibold text-sm px-4 py-2.5 rounded-xl transition-all cursor-pointer"
+              onClick={() => {
+                setImportForcedCategory(undefined);
+                setIsExcelImportOpen(true);
+              }}
+              className="flex items-center justify-center gap-2 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 font-semibold text-xs md:text-sm px-3 md:px-4 py-2.5 rounded-xl transition-all cursor-pointer"
+              title="Импорт съемок и общих программ"
             >
               <FileSpreadsheet className="w-4.5 h-4.5" />
-              Импорт из Excel
+              Импорт съемки
+            </button>
+            <button 
+              onClick={() => {
+                setImportForcedCategory('alignment');
+                setIsExcelImportOpen(true);
+              }}
+              className="flex items-center justify-center gap-2 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 font-semibold text-xs md:text-sm px-3 md:px-4 py-2.5 rounded-xl transition-all cursor-pointer"
+              title="Отдельный импорт файлов для выправки профилей"
+            >
+              <FileSpreadsheet className="w-4.5 h-4.5" />
+              Импорт выправки
             </button>
             <button 
               onClick={onAddProfileClick}
-              className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-sm px-4 py-2.5 rounded-xl transition-all shadow-sm shadow-blue-100 cursor-pointer"
+              className="flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs md:text-sm px-3 md:px-4 py-2.5 rounded-xl transition-all shadow-sm shadow-blue-100 cursor-pointer"
             >
               <Plus className="w-4.5 h-4.5" />
-              Добавить путь в программу
+              Добавить путь
             </button>
           </div>
         </div>
@@ -881,7 +897,11 @@ export const ProfileTable: React.FC<ProfileTableProps> = ({
       {isExcelImportOpen && (
         <ExcelImporter 
           onImport={onImportProfiles}
-          onClose={() => setIsExcelImportOpen(false)}
+          forcedCategory={importForcedCategory}
+          onClose={() => {
+            setIsExcelImportOpen(false);
+            setImportForcedCategory(undefined);
+          }}
         />
       )}
     </div>

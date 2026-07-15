@@ -1,16 +1,17 @@
 import React from 'react';
 import { X, Save, AlertTriangle, Calendar, MapPin, User, FileText, CheckCircle2 } from 'lucide-react';
 import { TrackProfile, ProfileStatus } from '../types';
+import { getCurrentDateString } from '../utils';
 
 interface ProfileFormProps {
   profile: TrackProfile | null; // Если null, значит создание новой записи
+  currentDate?: string;
   onSave: (profile: TrackProfile) => void;
   onClose: () => void;
 }
 
-export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, onSave, onClose }) => {
+export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, currentDate = getCurrentDateString(), onSave, onClose }) => {
   const isEditing = !!profile;
-  const currentDate = '2026-07-03';
 
   // Состояние формы
   const [station, setStation] = React.useState('');

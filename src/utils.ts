@@ -49,6 +49,43 @@ export function getCurrentDateString(): string {
   return `${year}-${month}-${day}`;
 }
 
+/**
+ * Форматирует дату на русском языке словами (например, 14 июля 2026 г.)
+ */
+export function formatDateInRussianWords(dateStr: string): string {
+  const trimmed = (dateStr || '').trim();
+  if (!trimmed) return '—';
+  
+  // Попробуем распарсить формат YYYY-MM-DD напрямую, чтобы избежать смещения таймзоны
+  const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const months = [
+    'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+    'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'
+  ];
+
+  if (match) {
+    const year = parseInt(match[1], 10);
+    const monthIdx = parseInt(match[2], 10) - 1;
+    const day = parseInt(match[3], 10);
+    if (monthIdx >= 0 && monthIdx < 12) {
+      return `${day} ${months[monthIdx]} ${year} г.`;
+    }
+  }
+
+  try {
+    const date = new Date(trimmed);
+    if (!isNaN(date.getTime())) {
+      const day = date.getDate();
+      const monthIdx = date.getMonth();
+      const year = date.getFullYear();
+      return `${day} ${months[monthIdx]} ${year} г.`;
+    }
+  } catch (e) {
+    // игнорируем ошибку парсинга
+  }
+  return trimmed;
+}
+
 export interface TbStatusResult {
   hasViolation: boolean; // Было ли нарушение вообще (активное или устраненное)
   isActive: boolean;     // Активен ли запрет ТБ прямо сейчас

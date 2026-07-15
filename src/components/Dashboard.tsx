@@ -8,7 +8,7 @@ import {
   TrendingUp, BarChart2, ShieldAlert, ArrowRight, MapPin, Gauge
 } from 'lucide-react';
 import { TrackProfile, AnalyticsSummary } from '../types';
-import { formatDate, getTbProhibitionStatus } from '../utils';
+import { formatDate, getTbProhibitionStatus, formatDateInRussianWords } from '../utils';
 
 interface DashboardProps {
   profiles: TrackProfile[];
@@ -214,6 +214,27 @@ export const Dashboard: React.FC<DashboardProps> = ({ profiles, currentDate, onS
     return profiles.filter(p => getTbProhibitionStatus(p, currentDate).isActive);
   }, [profiles]);
 
+  // Профили путей, которые перейдут в статус запрета ТБ (оставления без локомотива) в ближайшие 15 дней
+  const impendingProhibitionProfiles = React.useMemo(() => {
+    return profiles.filter(p => {
+      if (p.category !== 'survey' || !p.prevSurveyDate) return false;
+      
+      const isCompleted = p.status === 'approved' || p.status === 'tra_updated';
+      if (isCompleted) return false;
+      
+      const statusObj = getTbProhibitionStatus(p, currentDate);
+      if (statusObj.isActive || statusObj.isResolved) return false;
+      if (!statusObj.deadlineDateStr) return false;
+      
+      const dDate = new Date(statusObj.deadlineDateStr);
+      const cDate = new Date(currentDate);
+      const diffTime = dDate.getTime() - cDate.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      return diffDays >= 0 && diffDays <= 15;
+    });
+  }, [profiles, currentDate]);
+
   // Профили с устраненным нарушением (ранее был запрет, но теперь новый профиль утвержден/внесен в ТРА)
   const resolvedTbProfiles = React.useMemo(() => {
     return profiles.filter(p => getTbProhibitionStatus(p, currentDate).isResolved);
@@ -313,7 +334,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ profiles, currentDate, onS
             {categoryFilter === 'alignment' && "Программа выправки продольного профиля"}
           </h2>
           <p className="text-sm text-slate-500 mt-1">
-            Текущая дата контроля: <span className="font-semibold text-slate-700">03 июля 2026 г.</span> (разгар летне-путевых работ)
+            Текущая дата контроля: <span className="font-semibold text-slate-700">{formatDateInRussianWords(currentDate)}</span> (контроль плановых сроков и ТБ-запретов)
           </p>
         </div>
         <div className="flex items-center gap-4">
@@ -557,68 +578,153 @@ export const Dashboard: React.FC<DashboardProps> = ({ profiles, currentDate, onS
       {/* Нижняя часть: Сводка по предприятиям и Срочные критические работы */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {/* Критически важные работы: Просроченные или предстоящие (2/3 ширины) */}
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm lg:col-span-2 space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="font-bold text-slate-800 flex items-center gap-2">
-              <ShieldAlert className="w-5 h-5 text-red-500 animate-bounce" />
-              Критический статус: Нарушение сроков и Срочный контроль
-            </h3>
-            <span className="text-xs bg-red-50 text-red-600 px-2 py-1 rounded-full font-bold">
-              {criticalProfiles.length} объектов
-            </span>
-          </div>
+        {/* Левая часть: Критические работы и прогноз запретов ТБ (2/3 ширины) */}
+        <div className="lg:col-span-2 flex flex-col gap-6">
 
-          <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
-            {criticalProfiles.length === 0 ? (
-              <div className="text-center py-10 bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
-                <p className="text-sm font-semibold text-slate-700">Все съемки выполняются в установленные сроки!</p>
-                <p className="text-xs text-slate-400 mt-1">Просроченных или горящих планов нет.</p>
-              </div>
-            ) : (
-              criticalProfiles.map(p => (
-                <div 
-                  key={p.id} 
-                  onClick={() => onSelectProfile(p.id)}
-                  className={`p-4 rounded-xl border transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-3 ${
-                    p.isOverdue 
-                      ? 'bg-red-50/40 border-red-100 hover:border-red-200' 
-                      : 'bg-amber-50/40 border-amber-100 hover:border-amber-200'
-                  }`}
-                >
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-bold text-slate-800 text-sm md:text-base">{p.station}</span>
-                      <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-mono font-bold">
-                        {p.trackNumber}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-4 text-xs text-slate-500">
-                      <span className="flex items-center gap-1">
-                        <MapPin className="w-3.5 h-3.5 text-slate-400" />
-                        {p.enterprise}
-                      </span>
-                    </div>
-                  </div>
+          {/* Критически важные работы: Просроченные или предстоящие */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5 text-red-500 animate-bounce" />
+                Критический статус: Нарушение сроков и Срочный контроль
+              </h3>
+              <span className="text-xs bg-red-50 text-red-600 px-2 py-1 rounded-full font-bold">
+                {criticalProfiles.length} объектов
+              </span>
+            </div>
 
-                  <div className="flex items-center gap-4 justify-between md:justify-end border-t md:border-t-0 pt-2 md:pt-0">
-                    <div className="text-left md:text-right">
-                      <span className="text-xs text-slate-400 block">План: {formatDate(p.plannedDate)}</span>
-                      <span className={`text-xs font-bold ${p.isOverdue ? 'text-red-600' : 'text-amber-600'}`}>
-                        {p.isOverdue 
-                          ? `Просрочено на ${Math.abs(p.daysLeft)} дн.` 
-                          : `Осталось дней: ${p.daysLeft}`
-                        }
-                      </span>
-                    </div>
-                    <ArrowRight className="w-5 h-5 text-slate-400" />
-                  </div>
+            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
+              {criticalProfiles.length === 0 ? (
+                <div className="text-center py-10 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
+                  <p className="text-sm font-semibold text-slate-700">Все съемки выполняются в установленные сроки!</p>
+                  <p className="text-xs text-slate-400 mt-1">Просроченных или горящих планов нет.</p>
                 </div>
-              ))
-            )}
+              ) : (
+                criticalProfiles.map(p => (
+                  <div 
+                    key={p.id} 
+                    onClick={() => onSelectProfile(p.id)}
+                    className={`p-4 rounded-xl border transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-3 ${
+                      p.isOverdue 
+                        ? 'bg-red-50/40 border-red-100 hover:border-red-200' 
+                        : 'bg-amber-50/40 border-amber-100 hover:border-amber-200'
+                    }`}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-slate-800 text-sm md:text-base">{p.station}</span>
+                        <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full font-mono font-bold">
+                          {p.trackNumber}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4 text-xs text-slate-500">
+                        <span className="flex items-center gap-1">
+                          <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                          {p.enterprise}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 justify-between md:justify-end border-t md:border-t-0 pt-2 md:pt-0">
+                      <div className="text-left md:text-right">
+                        <span className="text-xs text-slate-400 block">План: {formatDate(p.plannedDate)}</span>
+                        <span className={`text-xs font-bold ${p.isOverdue ? 'text-red-600' : 'text-amber-600'}`}>
+                          {p.isOverdue 
+                            ? `Просрочено на ${Math.abs(p.daysLeft)} дн.` 
+                            : `Осталось дней: ${p.daysLeft}`
+                          }
+                        </span>
+                      </div>
+                      <ArrowRight className="w-5 h-5 text-slate-400" />
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
-        </div>
+
+          {/* Прогноз перехода в запрет ТБ (оставление подвижного состава без локомотива) */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5 text-amber-500 animate-pulse" />
+                <span>Прогноз ТБ-запретов: Истекает срок съемки (ближайшие 15 дней)</span>
+              </h3>
+              <span className={`text-xs px-2.5 py-1 rounded-full font-bold self-start sm:self-auto ${
+                impendingProhibitionProfiles.length > 0 
+                  ? 'bg-amber-100 text-amber-800' 
+                  : 'bg-emerald-100 text-emerald-800'
+              }`}>
+                {impendingProhibitionProfiles.length} путей на грани
+              </span>
+            </div>
+
+            <p className="text-xs text-slate-400 leading-relaxed">
+              Пути, у которых в течение ближайших 15 дней истекает допустимый межсъемочный интервал (3 или 10 лет). 
+              Если съемка не будет внесена в ТРА, данные пути автоматически перейдут в статус запрета оставления вагонов без локомотива.
+            </p>
+
+            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-2">
+              {impendingProhibitionProfiles.length === 0 ? (
+                <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                  <CheckCircle2 className="w-8 h-8 text-emerald-500 mx-auto mb-2" />
+                  <p className="text-sm font-semibold text-slate-700">Нет путей с риском блокировки в ближайшие 15 дней</p>
+                  <p className="text-xs text-slate-400 mt-1">Все профили путей имеют действующие съемки с достаточным запасом срока.</p>
+                </div>
+              ) : (
+                impendingProhibitionProfiles.map(p => {
+                  const statusObj = getTbProhibitionStatus(p, currentDate);
+                  const dDate = new Date(statusObj.deadlineDateStr);
+                  const cDate = new Date(currentDate);
+                  const diffTime = dDate.getTime() - cDate.getTime();
+                  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+                  return (
+                    <div 
+                      key={p.id} 
+                      onClick={() => onSelectProfile(p.id)}
+                      className="p-4 bg-amber-50/20 border border-amber-100/60 hover:border-amber-300 rounded-xl transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-3"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-bold text-slate-800 text-sm md:text-base">{p.station}</span>
+                          <span className="text-xs bg-amber-100/80 text-amber-900 px-2.5 py-0.5 rounded-full font-mono font-bold">
+                            Путь {p.trackNumber}
+                          </span>
+                          <span className="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium">
+                            {p.trackSpecialization || 'Приемо-отправочный'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-4 text-xs text-slate-500">
+                          <span className="flex items-center gap-1">
+                            <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                            {p.pch || p.enterprise}
+                          </span>
+                          <span>•</span>
+                          <span>Предыдущая съемка: {formatDate(p.prevSurveyDate)}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4 justify-between md:justify-end border-t border-amber-100/50 md:border-t-0 pt-2 md:pt-0">
+                        <div className="text-left md:text-right">
+                          <span className="text-xs text-slate-400 block">
+                            Срок истекает: {formatDate(statusObj.deadlineDateStr)}
+                          </span>
+                          <span className="text-xs font-bold text-amber-700">
+                            Осталось: {diffDays} дн.
+                          </span>
+                        </div>
+                        <ArrowRight className="w-5 h-5 text-amber-500" />
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+        </div> {/* Конец левой части (lg:col-span-2) */}
 
         {/* Рейтинг выполнения предприятий (1/3 ширины) */}
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm space-y-4">

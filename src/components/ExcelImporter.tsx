@@ -9,11 +9,13 @@ import * as XLSX from 'xlsx';
 interface ExcelImporterProps {
   onImport: (newProfiles: TrackProfile[], strategy: 'append' | 'overwrite') => void;
   onClose: () => void;
+  forcedCategory?: 'survey' | 'alignment';
 }
 
 export const ExcelImporter: React.FC<ExcelImporterProps> = ({
   onImport,
-  onClose
+  onClose,
+  forcedCategory
 }) => {
   const [file, setFile] = React.useState<File | null>(null);
   const [parsedRows, setParsedRows] = React.useState<any[]>([]);
@@ -25,16 +27,46 @@ export const ExcelImporter: React.FC<ExcelImporterProps> = ({
 
   // Спецификация маппинга колонок Excel (ищет совпадения по русским и английским названиям)
   const mapRowToProfile = (row: any, index: number, sheetName?: string): TrackProfile => {
-    // Вспомогательная функция поиска значения по синонимам заголовков
+    const normalizeKey = (s: string): string => {
+      return String(s)
+        .toLowerCase()
+        .replace(/ё/g, 'е')
+        .replace(/[\s\r\n\-\_\(\)\,\.\/]+/g, '')
+        .trim();
+    };
+
+    // Вспомогательная функция поиска значения по синонимам заголовков с интеллектуальным нормализованным сравнением
     const getValue = (keys: string[]): any => {
+      // 1. Попробуем точное совпадение нормализованных ключей
       for (const k of keys) {
-        const lowerK = k.toLowerCase();
-        // Ищем точное или частичное совпадение ключа в строке excel
-        const foundKey = Object.keys(row).find(
-          rk => rk.toLowerCase().trim() === lowerK || rk.toLowerCase().includes(lowerK)
-        );
+        const normK = normalizeKey(k);
+        if (!normK) continue;
+        const foundKey = Object.keys(row).find(rk => normalizeKey(rk) === normK);
         if (foundKey) return row[foundKey];
       }
+      
+      // 2. Попробуем частичное совпадение для достаточно длинных и специфичных ключей (длина > 3)
+      for (const k of keys) {
+        const normK = normalizeKey(k);
+        if (!normK || normK.length <= 3) continue;
+        const foundKey = Object.keys(row).find(rk => {
+          const normRk = normalizeKey(rk);
+          return normRk.includes(normK) || normK.includes(normRk);
+        });
+        if (foundKey) return row[foundKey];
+      }
+      
+      // 3. Последний шанс: частичное совпадение для коротких ключей
+      for (const k of keys) {
+        const normK = normalizeKey(k);
+        if (!normK) continue;
+        const foundKey = Object.keys(row).find(rk => {
+          const normRk = normalizeKey(rk);
+          return normRk.includes(normK);
+        });
+        if (foundKey) return row[foundKey];
+      }
+
       return undefined;
     };
 
@@ -105,8 +137,8 @@ export const ExcelImporter: React.FC<ExcelImporterProps> = ({
       return low.includes('выправка') || low.includes('уклон') || low.includes('цель') || low.includes('выполненн');
     });
 
-    let category: 'survey' | 'alignment' = hasAlignmentKeys ? 'alignment' : 'survey';
-    if (sheetName) {
+    let category: 'survey' | 'alignment' = forcedCategory || (hasAlignmentKeys ? 'alignment' : 'survey');
+    if (!forcedCategory && sheetName) {
       const lowSheet = sheetName.toLowerCase();
       if (lowSheet.includes('выправка') || lowSheet.includes('alignment')) {
         category = 'alignment';
@@ -257,17 +289,18 @@ export const ExcelImporter: React.FC<ExcelImporterProps> = ({
         'причины невыполнения', 'причины не выполнения', 'что сделано', 'описание причин', 'причина',
         'примечание (достижение цели работ'
       ];
+      const normNoteFields = noteFields.map(nf => normalizeKey(nf));
       const foundValues: string[] = [];
       Object.keys(row).forEach(rk => {
-        const lowKey = rk.toLowerCase().trim();
-        const matches = noteFields.some(nf => lowKey === nf || lowKey.includes(nf));
+        const normRk = normalizeKey(rk);
+        const matches = normNoteFields.some(nf => normRk === nf || normRk.includes(nf) || nf.includes(normRk));
         if (matches) {
           const val = row[rk];
           if (val !== undefined && val !== null) {
             const strVal = String(val).trim();
             if (strVal && !foundValues.includes(strVal)) {
-              if (lowKey.includes('причин') || lowKey.includes('сделано') || lowKey.includes('комментар') || lowKey.includes('примечан')) {
-                foundValues.push(`${rk.trim()}: ${strVal}`);
+              if (normRk.includes('причин') || normRk.includes('сделано') || normRk.includes('комментар') || normRk.includes('примечан')) {
+                foundValues.push(`${rk.replace(/\r?\n/g, ' ').trim()}: ${strVal}`);
               } else {
                 foundValues.push(strVal);
               }
@@ -483,8 +516,14 @@ export const ExcelImporter: React.FC<ExcelImporterProps> = ({
               <FileSpreadsheet className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-extrabold text-slate-900 text-base leading-tight">Импорт программы съемок из Excel</h3>
-              <p className="text-[11px] text-slate-400">Быстрая загрузка годовой программы съемки и выправки профилей в базу планшета</p>
+              <h3 className="font-extrabold text-slate-900 text-base leading-tight">
+                {forcedCategory === 'alignment' ? 'Импорт программы выправки продольных профилей' : 'Импорт программы съемок из Excel'}
+              </h3>
+              <p className="text-[11px] text-slate-400">
+                {forcedCategory === 'alignment' 
+                  ? 'Быстрая загрузка данных выправки продольных профилей из файла Excel' 
+                  : 'Быстрая загрузка годовой программы съемки и выправки профилей в базу планшета'}
+              </p>
             </div>
           </div>
           <button 

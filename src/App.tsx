@@ -16,7 +16,9 @@ import { formatDate, getTbProhibitionStatus, getCurrentDateString } from './util
 
 export default function App() {
   const LOCAL_STORAGE_KEY = 'track_profiles_program_2026';
-  const currentDate = getCurrentDateString();
+  const [currentDate, setCurrentDate] = React.useState<string>(() => {
+    return getCurrentDateString();
+  });
 
   // 1. Состояние профилей (база данных)
   const [profiles, setProfiles] = React.useState<TrackProfile[]>([]);
@@ -210,73 +212,87 @@ export default function App() {
             </div>
           </div>
 
-          {/* Панель навигации по вкладкам */}
-          <nav className="flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50">
-            <button
-              onClick={() => setActiveTab('dashboard')}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs md:text-sm font-bold transition-all cursor-pointer ${
-                activeTab === 'dashboard' 
-                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200/30' 
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <BarChart2 className="w-4 h-4" />
-              <span>Главная</span>
-            </button>
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Панель навигации по вкладкам */}
+            <nav className="flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200/50">
+              <button
+                onClick={() => setActiveTab('dashboard')}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs md:text-sm font-bold transition-all cursor-pointer ${
+                  activeTab === 'dashboard' 
+                    ? 'bg-white text-slate-900 shadow-xs border border-slate-200/30' 
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <BarChart2 className="w-4 h-4" />
+                <span>Главная</span>
+              </button>
 
-            <button
-              onClick={() => setActiveTab('program')}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs md:text-sm font-bold transition-all cursor-pointer ${
-                activeTab === 'program' 
-                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200/30' 
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <Calendar className="w-4 h-4" />
-              <span>Программа съемки</span>
-              {overdueCount > 0 && (
-                <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                  {overdueCount}
-                </span>
-              )}
-            </button>
+              <button
+                onClick={() => setActiveTab('program')}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs md:text-sm font-bold transition-all cursor-pointer ${
+                  activeTab === 'program' 
+                    ? 'bg-white text-slate-900 shadow-xs border border-slate-200/30' 
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <Calendar className="w-4 h-4" />
+                <span>Программа съемки</span>
+                {overdueCount > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                    {overdueCount}
+                  </span>
+                )}
+              </button>
 
-            <button
-              onClick={() => setActiveTab('tra')}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs md:text-sm font-bold transition-all cursor-pointer ${
-                activeTab === 'tra' 
-                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200/30' 
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <FileText className="w-4 h-4" />
-              <span>Контроль ТРА</span>
-            </button>
+              <button
+                onClick={() => setActiveTab('tra')}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs md:text-sm font-bold transition-all cursor-pointer ${
+                  activeTab === 'tra' 
+                    ? 'bg-white text-slate-900 shadow-xs border border-slate-200/30' 
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <FileText className="w-4 h-4" />
+                <span>Контроль ТРА</span>
+              </button>
 
-            <button
-              onClick={() => setActiveTab('reports')}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs md:text-sm font-bold transition-all cursor-pointer ${
-                activeTab === 'reports' 
-                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200/30' 
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <FileText className="w-4 h-4 text-emerald-600" />
-              <span>Анализ</span>
-            </button>
+              <button
+                onClick={() => setActiveTab('reports')}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs md:text-sm font-bold transition-all cursor-pointer ${
+                  activeTab === 'reports' 
+                    ? 'bg-white text-slate-900 shadow-xs border border-slate-200/30' 
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <FileText className="w-4 h-4 text-emerald-600" />
+                <span>Анализ</span>
+              </button>
 
-            <button
-              onClick={() => setActiveTab('backups')}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs md:text-sm font-bold transition-all cursor-pointer ${
-                activeTab === 'backups' 
-                  ? 'bg-white text-slate-900 shadow-xs border border-slate-200/30' 
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <HardDrive className="w-4 h-4" />
-              <span>Справка и бэкапы</span>
-            </button>
-          </nav>
+              <button
+                onClick={() => setActiveTab('backups')}
+                className={`flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs md:text-sm font-bold transition-all cursor-pointer ${
+                  activeTab === 'backups' 
+                    ? 'bg-white text-slate-900 shadow-xs border border-slate-200/30' 
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+              >
+                <HardDrive className="w-4 h-4" />
+                <span>Справка и бэкапы</span>
+              </button>
+            </nav>
+
+            {/* Интерактивный селектор текущей даты */}
+            <div className="flex items-center gap-2 bg-slate-100/80 px-3 py-1.5 rounded-xl border border-slate-200/50 text-xs md:text-sm shadow-xs">
+              <Calendar className="w-4 h-4 text-blue-600" />
+              <span className="text-slate-500 font-bold hidden sm:inline">Дата контроля:</span>
+              <input 
+                type="date" 
+                value={currentDate} 
+                onChange={(e) => setCurrentDate(e.target.value)}
+                className="bg-white border border-slate-200/60 rounded-lg px-2 py-0.5 text-slate-800 font-bold text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer animate-pulse-subtle"
+              />
+            </div>
+          </div>
 
         </div>
       </header>
@@ -601,6 +617,7 @@ export default function App() {
       {isFormOpen && (
         <ProfileForm 
           profile={editingProfile}
+          currentDate={currentDate}
           onSave={handleSaveProfile}
           onClose={() => setIsFormOpen(false)}
         />
