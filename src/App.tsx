@@ -383,211 +383,307 @@ export default function App() {
             </div>
 
             {/* Тело панели деталей */}
-            <div className="flex-1 p-5 overflow-y-auto space-y-6">
-              
-              {/* Информация о пути */}
-              <div className="space-y-1 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Железнодорожная Станция</span>
-                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase ${
-                    selectedProfile.category === 'alignment' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'
-                  }`}>
-                    {selectedProfile.category === 'alignment' ? 'Выправка' : 'Съемка'}
-                  </span>
-                </div>
-                <span className="text-xl font-extrabold text-slate-900 block">{selectedProfile.station}</span>
-                <span className="text-sm font-semibold text-slate-600 block">{selectedProfile.trackNumber}</span>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold inline-block mt-1 uppercase ${
-                  selectedProfile.trackType === 'main' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-600'
-                }`}>
-                  {selectedProfile.trackSpecialization ? `${selectedProfile.trackSpecialization} путь` : (selectedProfile.trackType === 'main' ? 'Главный путь' : selectedProfile.trackType === 'station' ? 'Приемо-отправочный путь' : 'Прочий путь')}
-                </span>
-              </div>
+            <div className="flex-1 p-5 overflow-y-auto space-y-5">
+              {selectedProfile.category === 'alignment' ? (
+                // -------------------------------------------------------------
+                // СТРУКТУРА КАРТОЧКИ: ВЫПРАВКА ПУТИ
+                // -------------------------------------------------------------
+                <div className="space-y-4">
+                  {/* Основная плашка станции и пути */}
+                  <div className="bg-slate-900 text-white p-5 rounded-2xl border border-slate-800 shadow-lg space-y-3 relative overflow-hidden">
+                    <div className="absolute right-3 top-3 opacity-10">
+                      <MapPin className="w-20 h-20 text-white" />
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[10px] text-slate-400 font-extrabold uppercase tracking-widest block">Карточка выправки пути</span>
+                      <h3 className="text-2xl font-black tracking-tight">{selectedProfile.station}</h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800 text-xs">
+                      <div>
+                        <span className="text-slate-400 font-bold block text-[10px] uppercase">Номер пути:</span>
+                        <span className="font-extrabold text-white text-sm">{selectedProfile.trackNumber}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 font-bold block text-[10px] uppercase">Специализация:</span>
+                        <span className="font-semibold text-slate-200 text-xs">
+                          {selectedProfile.trackSpecialization || (selectedProfile.trackType === 'main' ? 'Главный' : selectedProfile.trackType === 'station' ? 'Приемо-отправочный' : 'Прочий')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
 
-              {/* Интерактивная шкала (Timeline) Жизненного Цикла */}
-              <div className="space-y-4">
-                <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Этапы выполнения контроля</h4>
-                
-                <div className="relative pl-6 space-y-5 border-l border-slate-200 ml-3">
-                  
-                  {/* Шаг 1: Планирование */}
-                  <div className="relative">
-                    <span className="absolute -left-[31px] top-0.5 w-4.5 h-4.5 rounded-full bg-emerald-500 border-4 border-white flex items-center justify-center shadow-xs"></span>
-                    <div>
-                      <h5 className="font-bold text-slate-800 text-xs md:text-sm">Включение в план на 2026 г.</h5>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        {selectedProfile.category === 'alignment' ? 'Плановая выправка' : 'Плановая съемка'}: <strong className="text-slate-600">{formatDate(selectedProfile.plannedDate)}</strong>
+                  {/* Рабочие объемы и исполнитель */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3 text-xs md:text-sm">
+                    <div className="flex items-center justify-between py-1.5 border-b border-slate-200/60">
+                      <span className="text-slate-500 font-semibold">Исполнитель работы:</span>
+                      <span className="font-bold text-slate-800 text-right">{selectedProfile.enterprise || 'Не указан'}</span>
+                    </div>
+                    {selectedProfile.executorName && (
+                      <div className="flex items-center justify-between py-1.5 border-b border-slate-200/60">
+                        <span className="text-slate-500 font-semibold">Ответственный исполнитель:</span>
+                        <span className="font-bold text-slate-800">{selectedProfile.executorName}</span>
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-4 pt-1">
+                      <div className="bg-white p-3 rounded-xl border border-slate-200/60">
+                        <span className="text-slate-400 font-bold block text-[10px] uppercase">Объем работ по плану:</span>
+                        <span className="text-base font-black text-slate-800">
+                          {selectedProfile.workVolume !== undefined ? `${selectedProfile.workVolume} км` : '—'}
+                        </span>
+                      </div>
+                      <div className="bg-white p-3 rounded-xl border border-slate-200/60">
+                        <span className="text-slate-400 font-bold block text-[10px] uppercase">Объем выполненных работ:</span>
+                        <span className="text-base font-black text-emerald-600">
+                          {selectedProfile.completedVolume !== undefined ? `${selectedProfile.completedVolume} км` : '—'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Сроки и Даты проведения */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3 text-xs md:text-sm">
+                    <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Сроки и даты контроля</h4>
+                    
+                    <div className="flex justify-between py-1.5 border-b border-slate-200/60">
+                      <span className="text-slate-500 font-semibold">Срок выполнения выправки:</span>
+                      <span className="font-bold text-slate-800">{selectedProfile.quarter || formatDate(selectedProfile.plannedDate) || '—'}</span>
+                    </div>
+
+                    <div className="flex justify-between py-1.5 border-b border-slate-200/60">
+                      <span className="text-slate-500 font-semibold">Дата проведения выправки:</span>
+                      <span className="font-bold text-slate-800 font-mono">
+                        {selectedProfile.actualAlignmentDate ? formatDate(selectedProfile.actualAlignmentDate) : <span className="text-slate-400 font-normal">Не проводилась</span>}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between py-1.5 border-b border-slate-200/60">
+                      <span className="text-slate-500 font-semibold">Дата съемки (факт):</span>
+                      <span className="font-bold text-slate-800 font-mono">
+                        {selectedProfile.actualShotDate ? formatDate(selectedProfile.actualShotDate) : <span className="text-slate-400 font-normal">Не снималась</span>}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between py-1.5 border-b border-slate-200/60">
+                      <span className="text-slate-500 font-semibold">Дата утверждения профиля:</span>
+                      <span className="font-bold text-slate-800 font-mono">
+                        {selectedProfile.approvalDate ? formatDate(selectedProfile.approvalDate) : <span className="text-slate-400 font-normal">На утверждении</span>}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between py-1.5 border-b border-slate-200/60">
+                      <span className="text-slate-500 font-semibold">Дата утверждения акта ТРА:</span>
+                      <span className="font-bold text-slate-800 font-mono">
+                        {selectedProfile.traActApproveDate ? (
+                          formatDate(selectedProfile.traActApproveDate)
+                        ) : selectedProfile.traUpdateDate ? (
+                          `${formatDate(selectedProfile.traUpdateDate)} (ТРА обновлен)`
+                        ) : (
+                          <span className="text-slate-400 font-normal">Не утвержден</span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Цель и технические показатели */}
+                  <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 space-y-3 text-xs md:text-sm">
+                    <h4 className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider mb-1">Технические показатели и показатели ТРА</h4>
+                    
+                    <div className="space-y-1 py-1 border-b border-slate-200/60 pb-2">
+                      <span className="text-slate-500 font-semibold block text-[10px] uppercase">Цель работ:</span>
+                      <span className="font-bold text-slate-800 block leading-relaxed">{selectedProfile.alignmentGoal || '—'}</span>
+                    </div>
+
+                    <div className="flex justify-between py-1.5 border-b border-slate-200/60">
+                      <span className="text-slate-500 font-semibold">Приведенный уклон до/после (‰):</span>
+                      <span className="font-mono font-bold text-slate-800">{selectedProfile.slopeBeforeAfter || '—'}</span>
+                    </div>
+
+                    <div className="flex justify-between py-1.5">
+                      <span className="text-slate-500 font-semibold">Количество ТБ до/после выправки:</span>
+                      <span className="font-mono font-bold text-slate-800">{selectedProfile.tbBeforeAfter || '—'}</span>
+                    </div>
+                  </div>
+
+                  {/* Примечания */}
+                  {selectedProfile.notes && (
+                    <div className="space-y-1.5">
+                      <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">Примечания по объекту:</span>
+                      <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-xl border leading-relaxed">
+                        {selectedProfile.notes}
                       </p>
                     </div>
-                  </div>
-
-                  {/* Шаг 2: Выполнение работы */}
-                  <div className="relative">
-                    <span className={`absolute -left-[31px] top-0.5 w-4.5 h-4.5 rounded-full border-4 border-white flex items-center justify-center shadow-xs ${
-                      selectedProfile.status !== 'planned' ? 'bg-emerald-500' : 'bg-slate-300'
-                    }`}></span>
-                    <div>
-                      <h5 className="font-bold text-slate-800 text-xs md:text-sm">
-                        {selectedProfile.category === 'alignment' ? 'Фактическое выполнение выправки' : 'Фактическая съемка продольного профиля'}
-                      </h5>
-                      {selectedProfile.category === 'alignment' ? (
-                        selectedProfile.actualAlignmentDate ? (
-                          <p className="text-xs text-emerald-600 font-semibold mt-0.5">Выправлено: {formatDate(selectedProfile.actualAlignmentDate)}</p>
-                        ) : (
-                          <p className="text-xs text-slate-400 mt-0.5">Ожидание выполнения выправки исполнителем</p>
-                        )
-                      ) : (
-                        selectedProfile.actualShotDate ? (
-                          <p className="text-xs text-emerald-600 font-semibold mt-0.5">Снято: {formatDate(selectedProfile.actualShotDate)}</p>
-                        ) : (
-                          <p className="text-xs text-slate-400 mt-0.5">Ожидание выполнения съемки исполнителем</p>
-                        )
-                      )}
+                  )}
+                </div>
+              ) : (
+                // -------------------------------------------------------------
+                // СТРУКТУРА КАРТОЧКИ: СЪЕМКА ПРОДОЛЬНОГО ПРОФИЛЯ (ИСХОДНАЯ)
+                // -------------------------------------------------------------
+                <>
+                  {/* Информация о пути */}
+                  <div className="space-y-1 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Железнодорожная Станция</span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase bg-blue-100 text-blue-800`}>
+                        Съемка
+                      </span>
                     </div>
+                    <span className="text-xl font-extrabold text-slate-900 block">{selectedProfile.station}</span>
+                    <span className="text-sm font-semibold text-slate-600 block">{selectedProfile.trackNumber}</span>
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold inline-block mt-1 uppercase ${
+                      selectedProfile.trackType === 'main' ? 'bg-indigo-50 text-indigo-700' : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      {selectedProfile.trackSpecialization ? `${selectedProfile.trackSpecialization} путь` : (selectedProfile.trackType === 'main' ? 'Главный путь' : selectedProfile.trackType === 'station' ? 'Приемо-отправочный путь' : 'Прочий путь')}
+                    </span>
                   </div>
 
-                  {/* Шаг 3: Утверждение */}
-                  <div className="relative">
-                    <span className={`absolute -left-[31px] top-0.5 w-4.5 h-4.5 rounded-full border-4 border-white flex items-center justify-center shadow-xs ${
-                      selectedProfile.status === 'approved' || selectedProfile.status === 'tra_updated' ? 'bg-emerald-500' : 'bg-slate-300'
-                    }`}></span>
-                    <div>
-                      <h5 className="font-bold text-slate-800 text-xs md:text-sm">
-                        {selectedProfile.category === 'alignment' ? 'Приемка и утверждение результатов выправки' : 'Утверждение профиля службой пути'}
-                      </h5>
-                      {selectedProfile.approvalDate ? (
-                        <p className="text-xs text-emerald-600 font-semibold mt-0.5">Утвержден: {formatDate(selectedProfile.approvalDate)}</p>
-                      ) : (
-                        <p className="text-xs text-slate-400 mt-0.5">На согласовании / приемке</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Шаг 4: ТРА */}
-                  <div className="relative">
-                    <span className={`absolute -left-[31px] top-0.5 w-4.5 h-4.5 rounded-full border-4 border-white flex items-center justify-center shadow-xs ${
-                      selectedProfile.status === 'tra_updated' ? 'bg-emerald-500' : 'bg-slate-300'
-                    }`}></span>
-                    <div>
-                      <h5 className="font-bold text-slate-800 text-xs md:text-sm">Внесение изменений в ТРА станции</h5>
-                      {selectedProfile.traUpdateDate ? (
-                        <div className="space-y-0.5 mt-0.5">
-                           <p className="text-xs text-emerald-600 font-semibold">Внесено в ТРА: {formatDate(selectedProfile.traUpdateDate)}</p>
-                          <p className="text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md inline-block font-mono">
-                            Приказ/Акт: {selectedProfile.traDocNumber}
+                  {/* Интерактивная шкала (Timeline) Жизненного Цикла */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Этапы выполнения контроля</h4>
+                    
+                    <div className="relative pl-6 space-y-5 border-l border-slate-200 ml-3">
+                      
+                      {/* Шаг 1: Планирование */}
+                      <div className="relative">
+                        <span className="absolute -left-[31px] top-0.5 w-4.5 h-4.5 rounded-full bg-emerald-500 border-4 border-white flex items-center justify-center shadow-xs"></span>
+                        <div>
+                          <h5 className="font-bold text-slate-800 text-xs md:text-sm">Включение в план на 2026 г.</h5>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            Плановая съемка: <strong className="text-slate-600">{formatDate(selectedProfile.plannedDate)}</strong>
                           </p>
                         </div>
-                      ) : (
-                        <p className="text-xs text-slate-400 mt-0.5">Бумажные акты не внесены в ТРА</p>
-                      )}
+                      </div>
+
+                      {/* Шаг 2: Выполнение работы */}
+                      <div className="relative">
+                        <span className={`absolute -left-[31px] top-0.5 w-4.5 h-4.5 rounded-full border-4 border-white flex items-center justify-center shadow-xs ${
+                          selectedProfile.status !== 'planned' ? 'bg-emerald-500' : 'bg-slate-300'
+                        }`}></span>
+                        <div>
+                          <h5 className="font-bold text-slate-800 text-xs md:text-sm">
+                            Фактическая съемка продольного профиля
+                          </h5>
+                          {selectedProfile.actualShotDate ? (
+                            <p className="text-xs text-emerald-600 font-semibold mt-0.5">Снято: {formatDate(selectedProfile.actualShotDate)}</p>
+                          ) : (
+                            <p className="text-xs text-slate-400 mt-0.5">Ожидержание выполнения съемки исполнителем</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Шаг 3: Утверждение */}
+                      <div className="relative">
+                        <span className={`absolute -left-[31px] top-0.5 w-4.5 h-4.5 rounded-full border-4 border-white flex items-center justify-center shadow-xs ${
+                          selectedProfile.status === 'approved' || selectedProfile.status === 'tra_updated' ? 'bg-emerald-500' : 'bg-slate-300'
+                        }`}></span>
+                        <div>
+                          <h5 className="font-bold text-slate-800 text-xs md:text-sm">
+                            Утверждение профиля службой пути
+                          </h5>
+                          {selectedProfile.approvalDate ? (
+                            <p className="text-xs text-emerald-600 font-semibold mt-0.5">Утвержден: {formatDate(selectedProfile.approvalDate)}</p>
+                          ) : (
+                            <p className="text-xs text-slate-400 mt-0.5">На согласовании / приемке</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Шаг 4: ТРА */}
+                      <div className="relative">
+                        <span className={`absolute -left-[31px] top-0.5 w-4.5 h-4.5 rounded-full border-4 border-white flex items-center justify-center shadow-xs ${
+                          selectedProfile.status === 'tra_updated' ? 'bg-emerald-500' : 'bg-slate-300'
+                        }`}></span>
+                        <div>
+                          <h5 className="font-bold text-slate-800 text-xs md:text-sm">Внесение изменений в ТРА станции</h5>
+                          {selectedProfile.traUpdateDate ? (
+                            <div className="space-y-0.5 mt-0.5">
+                              <p className="text-xs text-emerald-600 font-semibold">Внесено в ТРА: {formatDate(selectedProfile.traUpdateDate)}</p>
+                              <p className="text-[11px] bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md inline-block font-mono">
+                                Приказ/Акт: {selectedProfile.traDocNumber}
+                              </p>
+                            </div>
+                          ) : (
+                            <p className="text-xs text-slate-400 mt-0.5">Бумажные акты не внесены в ТРА</p>
+                          )}
+                        </div>
+                      </div>
+
                     </div>
                   </div>
 
-                </div>
-              </div>
-
-              {/* Детализация участников и заметок */}
-              <div className="space-y-3 pt-3 border-t border-slate-100 text-xs md:text-sm">
-                
-                <div className="flex justify-between py-1.5 border-b border-slate-50">
-                  <span className="text-slate-400 font-semibold">Организация-исполнитель:</span>
-                  <span className="font-bold text-slate-800 text-right max-w-[200px]">{selectedProfile.enterprise}</span>
-                </div>
-
-                {selectedProfile.executorName && (
-                  <div className="flex justify-between py-1.5 border-b border-slate-50">
-                    <span className="text-slate-400 font-semibold">Инженер-исполнитель:</span>
-                    <span className="font-bold text-slate-800">{selectedProfile.executorName}</span>
-                  </div>
-                )}
-
-                {/* Объемы и параметры для выправки / съемки */}
-                {selectedProfile.workVolume !== undefined && (
-                  <div className="flex justify-between py-1.5 border-b border-slate-50">
-                    <span className="text-slate-400 font-semibold">Плановый объем (км):</span>
-                    <span className="font-bold text-slate-800">{selectedProfile.workVolume} км</span>
-                  </div>
-                )}
-
-                {selectedProfile.completedVolume !== undefined && (
-                  <div className="flex justify-between py-1.5 border-b border-slate-50">
-                    <span className="text-slate-400 font-semibold">Выполненный объем (км):</span>
-                    <span className="font-bold text-emerald-600">{selectedProfile.completedVolume} км</span>
-                  </div>
-                )}
-
-                {selectedProfile.category === 'alignment' && selectedProfile.alignmentGoal && (
-                  <div className="flex justify-between py-1.5 border-b border-slate-50">
-                    <span className="text-slate-400 font-semibold">Цель работ:</span>
-                    <span className="font-bold text-slate-800 text-right">{selectedProfile.alignmentGoal}</span>
-                  </div>
-                )}
-
-                {selectedProfile.category === 'alignment' && selectedProfile.slopeBeforeAfter && (
-                  <div className="flex justify-between py-1.5 border-b border-slate-50">
-                    <span className="text-slate-400 font-semibold">Уклон до/после (‰):</span>
-                    <span className="font-mono font-bold text-slate-800">{selectedProfile.slopeBeforeAfter}</span>
-                  </div>
-                )}
-
-                {selectedProfile.category === 'alignment' && selectedProfile.tbBeforeAfter && (
-                  <div className="flex justify-between py-1.5 border-b border-slate-50">
-                    <span className="text-slate-400 font-semibold">Количество т/б до/после:</span>
-                    <span className="font-mono font-bold text-slate-800">{selectedProfile.tbBeforeAfter}</span>
-                  </div>
-                )}
-
-                {selectedProfile.category === 'survey' && selectedProfile.prevSurveyDate && (
-                  <div className="space-y-1.5 py-1.5 border-b border-slate-50">
-                    <div className="flex justify-between">
-                      <span className="text-slate-400 font-semibold">Дата предыдущей съемки:</span>
-                      <span className="font-mono font-bold text-slate-800">{formatDate(selectedProfile.prevSurveyDate)}</span>
+                  {/* Детализация участников и заметок */}
+                  <div className="space-y-3 pt-3 border-t border-slate-100 text-xs md:text-sm">
+                    
+                    <div className="flex justify-between py-1.5 border-b border-slate-50">
+                      <span className="text-slate-400 font-semibold">Организация-исполнитель:</span>
+                      <span className="font-bold text-slate-800 text-right max-w-[200px]">{selectedProfile.enterprise}</span>
                     </div>
-                    {(() => {
-                      const tbStatus = getTbProhibitionStatus(selectedProfile, currentDate);
-                      if (tbStatus.isActive) {
-                        return (
-                          <div className="bg-rose-50 text-rose-800 text-[11px] p-2.5 rounded-lg border border-rose-100 flex items-start gap-1.5 mt-1 leading-normal">
-                            <ShieldAlert className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                            <div>
-                              <span className="font-bold block text-rose-700">ЗАКРЕПЛЕНИЕ ТБ ЗАПРЕЩЕНО!</span>
-                              Срок действия предыдущей съемки ({formatDate(selectedProfile.prevSurveyDate)}) превысил {tbStatus.limitYears} {tbStatus.limitYears === 3 ? 'года' : 'лет'} (истек {formatDate(tbStatus.deadlineDateStr)}) для {selectedProfile.trackNumber.toLowerCase().includes('сортировоч') ? 'сортировочного' : 'данного'} пути. Закреплять вагоны тормозными башмаками на данном пути категорически запрещено!
-                            </div>
-                          </div>
-                        );
-                      } else if (tbStatus.isResolved) {
-                        return (
-                          <div className="bg-emerald-50 text-emerald-800 text-[11px] p-2.5 rounded-lg border border-emerald-100 flex items-start gap-1.5 mt-1 leading-normal">
-                            <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
-                            <div>
-                              <span className="font-bold block text-emerald-700">ЗАПРЕТ ТБ СНЯТ (НАРУШЕНИЕ УСТРАНЕНО)!</span>
-                              Срок действия предыдущей съемки ({formatDate(selectedProfile.prevSurveyDate)}) превышал {tbStatus.limitYears} {tbStatus.limitYears === 3 ? 'года' : 'лет'} (истек {formatDate(tbStatus.deadlineDateStr)}), но сейчас новый профиль успешно утвержден и внесен в ТРА. Нарушение устранено, запрет на закрепление вагонов ТБ официально снят.
-                            </div>
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
+
+                    {selectedProfile.executorName && (
+                      <div className="flex justify-between py-1.5 border-b border-slate-50">
+                        <span className="text-slate-400 font-semibold">Инженер-исполнитель:</span>
+                        <span className="font-bold text-slate-800">{selectedProfile.executorName}</span>
+                      </div>
+                    )}
+
+                    {selectedProfile.workVolume !== undefined && (
+                      <div className="flex justify-between py-1.5 border-b border-slate-50">
+                        <span className="text-slate-400 font-semibold">Плановый объем (км):</span>
+                        <span className="font-bold text-slate-800">{selectedProfile.workVolume} км</span>
+                      </div>
+                    )}
+
+                    {selectedProfile.prevSurveyDate && (
+                      <div className="space-y-1.5 py-1.5 border-b border-slate-50">
+                        <div className="flex justify-between">
+                          <span className="text-slate-400 font-semibold">Дата предыдущей съемки:</span>
+                          <span className="font-mono font-bold text-slate-800">{formatDate(selectedProfile.prevSurveyDate)}</span>
+                        </div>
+                        {(() => {
+                          const tbStatus = getTbProhibitionStatus(selectedProfile, currentDate);
+                          if (tbStatus.isActive) {
+                            return (
+                              <div className="bg-rose-50 text-rose-800 text-[11px] p-2.5 rounded-lg border border-rose-100 flex items-start gap-1.5 mt-1 leading-normal">
+                                <ShieldAlert className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                                <div>
+                                  <span className="font-bold block text-rose-700">ЗАКРЕПЛЕНИЕ ТБ ЗАПРЕЩЕНО!</span>
+                                  Срок действия предыдущей съемки ({formatDate(selectedProfile.prevSurveyDate)}) превысил {tbStatus.limitYears} {tbStatus.limitYears === 3 ? 'года' : 'лет'} (истек {formatDate(tbStatus.deadlineDateStr)}) для {selectedProfile.trackNumber.toLowerCase().includes('сортировоч') ? 'сортировочного' : 'данного'} пути. Закреплять вагоны тормозными башмаками на данном пути категорически запрещено!
+                                </div>
+                              </div>
+                            );
+                          } else if (tbStatus.isResolved) {
+                            return (
+                              <div className="bg-emerald-50 text-emerald-800 text-[11px] p-2.5 rounded-lg border border-emerald-100 flex items-start gap-1.5 mt-1 leading-normal">
+                                <CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                                <div>
+                                  <span className="font-bold block text-emerald-700">ЗАПРЕТ ТБ СНЯТ (НАРУШЕНИЕ УСТРАНЕНО)!</span>
+                                  Срок действия предыдущей съемки ({formatDate(selectedProfile.prevSurveyDate)}) превышал {tbStatus.limitYears} {tbStatus.limitYears === 3 ? 'года' : 'лет'} (истек {formatDate(tbStatus.deadlineDateStr)}), но сейчас новый профиль успешно утвержден и внесен в ТРА. Нарушение устранено, запрет на закрепление вагонов ТБ официально снят.
+                                </div>
+                              </div>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </div>
+                    )}
+
+                    <div className="flex justify-between py-1.5 border-b border-slate-50">
+                      <span className="text-slate-400 font-semibold">Дата добавления:</span>
+                      <span className="font-mono text-slate-600">
+                        {new Date(selectedProfile.createdAt).toLocaleDateString('ru-RU')}
+                      </span>
+                    </div>
+
+                    {selectedProfile.notes && (
+                      <div className="space-y-1.5 pt-2">
+                        <span className="text-slate-400 font-bold block">Служебные примечания:</span>
+                        <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-lg border leading-relaxed">
+                          {selectedProfile.notes}
+                        </p>
+                      </div>
+                    )}
                   </div>
-                )}
-
-                <div className="flex justify-between py-1.5 border-b border-slate-50">
-                  <span className="text-slate-400 font-semibold">Дата добавления:</span>
-                  <span className="font-mono text-slate-600">
-                    {new Date(selectedProfile.createdAt).toLocaleDateString('ru-RU')}
-                  </span>
-                </div>
-
-                {selectedProfile.notes && (
-                  <div className="space-y-1.5 pt-2">
-                    <span className="text-slate-400 font-bold block">Служебные примечания:</span>
-                    <p className="text-xs text-slate-600 bg-slate-50 p-3 rounded-lg border leading-relaxed">
-                      {selectedProfile.notes}
-                    </p>
-                  </div>
-                )}
-              </div>
-
+                </>
+              )}
             </div>
 
             {/* Подвал панели деталей: Быстрое редактирование карточки */}

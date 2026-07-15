@@ -28,6 +28,7 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, currentDate =
   const [actualAlignmentDate, setActualAlignmentDate] = React.useState('');
   const [approvalDate, setApprovalDate] = React.useState('');
   const [traUpdateDate, setTraUpdateDate] = React.useState('');
+  const [traActApproveDate, setTraActApproveDate] = React.useState('');
   
   // Дополнительные поля для обеих категорий
   const [workVolume, setWorkVolume] = React.useState<string>('');
@@ -63,6 +64,7 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, currentDate =
       setApprovalDate(profile.approvalDate || '');
       // If traUpdateDate is not explicitly present, use profileCheckDsDate or actual date
       setTraUpdateDate(profile.traUpdateDate || '');
+      setTraActApproveDate(profile.traActApproveDate || '');
       setTraDocNumber(profile.traDocNumber || '');
       setExecutorName(profile.executorName || '');
       setNotes(profile.notes || '');
@@ -86,6 +88,7 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, currentDate =
       setPrevSurveyDate('');
       setApprovalDate('');
       setTraUpdateDate('');
+      setTraActApproveDate('');
       setTraDocNumber('');
       setExecutorName('');
       setNotes('');
@@ -130,13 +133,16 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, currentDate =
       setActualAlignmentDate('');
       setApprovalDate('');
       setTraUpdateDate('');
+      setTraActApproveDate('');
       setTraDocNumber('');
     } else if (newStatus === 'shot') {
       setApprovalDate('');
       setTraUpdateDate('');
+      setTraActApproveDate('');
       setTraDocNumber('');
     } else if (newStatus === 'approved') {
       setTraUpdateDate('');
+      setTraActApproveDate('');
       setTraDocNumber('');
     }
   };
@@ -170,10 +176,11 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, currentDate =
       prevSurveyDate: category === 'survey' && prevSurveyDate ? prevSurveyDate : undefined,
       
       // Включаем только заполненные даты
-      actualShotDate: status !== 'planned' && category === 'survey' && actualShotDate ? actualShotDate : undefined,
+      actualShotDate: status !== 'planned' && actualShotDate ? actualShotDate : undefined,
       actualAlignmentDate: status !== 'planned' && category === 'alignment' && actualAlignmentDate ? actualAlignmentDate : undefined,
       approvalDate: (status === 'approved' || status === 'tra_updated') && approvalDate ? approvalDate : undefined,
       traUpdateDate: status === 'tra_updated' && traUpdateDate ? traUpdateDate : undefined,
+      traActApproveDate: status === 'tra_updated' && traActApproveDate ? traActApproveDate : undefined,
       traDocNumber: status === 'tra_updated' && traDocNumber.trim() ? traDocNumber.trim() : undefined,
       executorName: executorName.trim() || undefined,
       notes: notes.trim() || undefined,
@@ -561,10 +568,23 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, currentDate =
                   )}
                 </div>
 
+                {/* Дополнительная дата съемки для выправки */}
+                {category === 'alignment' && (
+                  <div className="space-y-1 animate-in fade-in duration-100">
+                    <label className="text-xs font-bold text-slate-500">Дата съемки (факт)</label>
+                    <input 
+                      type="date" 
+                      value={actualShotDate}
+                      onChange={(e) => setActualShotDate(e.target.value)}
+                      className="w-full bg-white border border-slate-200 rounded-xl p-2 text-xs font-semibold focus:outline-none"
+                    />
+                  </div>
+                )}
+
                 {/* Дата утверждения */}
                 {(status === 'approved' || status === 'tra_updated') && (
                   <div className="space-y-1 animate-in fade-in duration-100">
-                    <label className="text-xs font-bold text-slate-500">Дата утверждения</label>
+                    <label className="text-xs font-bold text-slate-500">Дата утверждения профиля</label>
                     <input 
                       type="date" 
                       value={approvalDate}
@@ -584,6 +604,19 @@ export const ProfileForm: React.FC<ProfileFormProps> = ({ profile, currentDate =
                       value={traUpdateDate}
                       onChange={(e) => setTraUpdateDate(e.target.value)}
                       required={status === 'tra_updated'}
+                      className="w-full bg-white border border-slate-200 rounded-xl p-2 text-xs font-semibold focus:outline-none"
+                    />
+                  </div>
+                )}
+
+                {/* Дата утверждения акта ТРА */}
+                {status === 'tra_updated' && (
+                  <div className="space-y-1 animate-in fade-in duration-100">
+                    <label className="text-xs font-bold text-slate-500">Дата утверждения акта ТРА</label>
+                    <input 
+                      type="date" 
+                      value={traActApproveDate}
+                      onChange={(e) => setTraActApproveDate(e.target.value)}
                       className="w-full bg-white border border-slate-200 rounded-xl p-2 text-xs font-semibold focus:outline-none"
                     />
                   </div>
